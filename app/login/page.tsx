@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Logo from "@/components/Logo";
 
 export default function LoginPage() {
   const [code, setCode] = useState("");
@@ -13,7 +14,7 @@ export default function LoginPage() {
   return (
     <div className="login" style={{ gridColumn: "1 / -1" }}>
       <form className="card stack" style={{ width: 340 }} onSubmit={submit}>
-        <div className="logo" style={{ padding: 0 }}>theo<span>.organizer</span></div>
+        <Logo />
         <input className="input" type="password" autoFocus placeholder="Passcode" value={code} onChange={(e) => setCode(e.target.value)} />
         {error && <div className="err">{error}</div>}
         <button className="btn primary">Unlock</button>

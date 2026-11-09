@@ -68,6 +68,23 @@ CREATE TABLE IF NOT EXISTS learned_plans (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Your 👍 / 👎 on THEO's suggestions, plus where you moved the due date.
+-- Used to tune project guesses, step templates and typical lead times.
+CREATE TABLE IF NOT EXISTS task_feedback (
+  id                    SERIAL PRIMARY KEY,
+  task_id               INT REFERENCES tasks(id) ON DELETE SET NULL,
+  vote                  TEXT CHECK (vote IN ('up','down')),
+  aspects               TEXT[] NOT NULL DEFAULT '{}',   -- what was off: project | due | steps | title
+  brief                 TEXT NOT NULL DEFAULT '',
+  suggested_project_id  INT REFERENCES projects(id) ON DELETE SET NULL,
+  chosen_project_id     INT REFERENCES projects(id) ON DELETE SET NULL,
+  suggested_due         DATE,
+  chosen_due            DATE,
+  lead_days             INT,                           -- chosen_due − day it was added
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS task_feedback_project_idx ON task_feedback (chosen_project_id);
+
 -- Seed a few starter projects (ignored if they already exist).
 INSERT INTO projects (name, color) VALUES
   ('Home', 'orange'), ('Health', 'green'), ('Finance', 'yellow'),

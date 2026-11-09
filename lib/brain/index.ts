@@ -46,18 +46,23 @@ export function splitBulk(text: string): string[] {
     .filter((l) => l.length > 1);
 }
 
-export function analyzeTask(line: string, today: string, ctx: BrainContext): TaskDraft {
+export function analyzeTask(line: string, today: string, ctx: BrainContext, brief = ""): TaskDraft {
   const due = parseDue(line, today);
-  const cls = classify(due.cleaned, ctx.projects, ctx.learnedKeywords);
+  const briefDue = brief.trim() ? parseDue(brief, today) : null;
+  const cls = classify(due.cleaned, ctx.projects, ctx.learnedKeywords, briefDue?.cleaned ?? "");
   const title = tidyTitle(cls.cleaned) || tidyTitle(line);
   const plan = suggestSteps(title, ctx.learnedPlans);
 
   let dueDate = due.date;
   let dueReason = due.reason;
+  if (!dueDate && briefDue?.date) {
+    dueDate = briefDue.date;
+    dueReason = `From your brief: ${briefDue.reason.replace(/^You said /, "")}`;
+  }
   if (!dueDate) {
     if (cls.priority === 1) {
       dueDate = today;
-      dueReason = "Marked urgent, so today";
+      dueReason = brief && !/\b(asap|urgent|important|critical|immediately|now)\b|!/i.test(line) ? "Your brief says it's urgent, so today" : "Marked urgent, so today";
     } else {
       const learnedLead = cls.projectId != null ? ctx.leadTimes[cls.projectId] : undefined;
       let lead = learnedLead != null ? Math.max(1, Math.round(learnedLead)) : DEFAULT_LEAD[cls.projectName ?? ""] ?? 3;

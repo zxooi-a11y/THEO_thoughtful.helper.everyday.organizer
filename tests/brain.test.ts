@@ -65,3 +65,23 @@ test("goal playbooks", () => {
   assert.equal(mine.source, "learned");
   assert.equal(mine.tasks[0].title, "Bake test batch");
 });
+
+test("a brief steers project, due date and priority", () => {
+  const withBrief = (line: string, brief: string) => analyzeTask(line, TODAY, ctx, brief);
+  // Vague line + brief naming a project → that project.
+  assert.equal(withBrief("sort out the logo", "all for my Business, launching at the Christmas market").projectName, "Business");
+  // Brief date fills in when the line has none; the line's own date still wins.
+  const a = withBrief("email the supplier", "everything needs to be done by 3 Dec");
+  assert.equal(a.dueDate, "2026-12-03");
+  assert.match(a.dueReason, /brief/i);
+  assert.equal(withBrief("email the supplier tomorrow", "everything by 3 Dec").dueDate, "2026-11-10");
+  // Urgent brief → high priority.
+  assert.equal(withBrief("call the bank", "these are urgent").priority, 1);
+  // The task's own clear words beat a weak brief.
+  assert.equal(withBrief("book dentist appointment", "random stuff for this week").projectName, "Health");
+});
+
+test("negative learned weights push a project away", () => {
+  const learned: BrainContext = { ...ctx, learnedKeywords: { groceri: { 5: -3 }, grocery: { 5: -3 } } };
+  assert.notEqual(analyzeTask("buy groceries", TODAY, learned).projectName, "Errands");
+});

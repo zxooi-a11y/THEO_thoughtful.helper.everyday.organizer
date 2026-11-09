@@ -40,8 +40,14 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
   background: var(--sidebar); padding: 40px 22px 24px; display: flex; flex-direction: column;
   position: sticky; top: 0; height: 100vh;
 }
-.logo { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; padding: 0 14px 44px; }
-.logo span { color: var(--accent); }
+.logo { padding: 0 14px 40px; }
+.logo-title { font-size: 30px; font-weight: 800; letter-spacing: 0.04em; line-height: 1; }
+.logo-title span { color: var(--accent); }
+.logo-sub {
+  margin-top: 8px; padding-top: 8px; border-top: 2px solid var(--accent);
+  font-size: 11px; font-weight: 600; color: var(--muted); line-height: 1.4;
+}
+.logo-hl { color: var(--accent-dark); font-weight: 800; }
 .nav { display: flex; flex-direction: column; gap: 6px; }
 .nav a {
   display: flex; align-items: center; gap: 14px; padding: 13px 14px; border-radius: 12px;
@@ -205,7 +211,9 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; background: none; }
   .sidebar { position: sticky; z-index: 30; height: auto; flex-direction: row; align-items: center; padding: 12px 16px; gap: 6px; overflow-x: auto; }
-  .logo { padding: 0 10px 0 0; font-size: 18px; }
+  .logo { padding: 0 10px 0 0; }
+  .logo-title { font-size: 20px; }
+  .logo-sub { display: none; }
   .nav { flex-direction: row; }
   .nav a { padding: 8px 10px; font-size: 13px; }
   .nav a span { display: none; }
@@ -226,3 +234,21 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
   .plan-step > .input-date, .plan-step > .input-est { grid-column: 2; }
   .fab { right: 16px; bottom: 16px; }
 }
+
+/* Brief + feedback */
+.brief { margin-top: 16px; border: 1px dashed var(--muted-2); border-radius: 12px; padding: 12px 14px; background: #fffdf9; }
+.brief-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 0; background: transparent; padding: 0; text-align: left; }
+.brief-toggle svg { color: var(--accent); }
+.vote { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 3px 9px; font-size: 14px; line-height: 1.4; filter: grayscale(1); opacity: .7; }
+.vote:hover { opacity: 1; filter: none; }
+.vote.on { filter: none; opacity: 1; background: #e9f7ec; border-color: #9fd9ae; }
+.vote.on.down { background: #fdecef; border-color: #f2b3be; }
+.pill { border: 1px solid var(--line); background: var(--card); border-radius: 20px; padding: 3px 10px; font-size: 12px; font-weight: 700; color: #7b756c; }
+.pill.on { background: #fdecef; border-color: #f2b3be; color: var(--danger); }
+.draft.voted-up { box-shadow: inset 3px 0 0 #5cc97b; }
+.draft.voted-down { box-shadow: inset 3px 0 0 #ed8a9c; }
+
+/* Project management */
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch { width: 22px; height: 22px; border-radius: 7px; border: 0; padding: 0; }
+.swatch.on { outline: 2px solid var(--text); outline-offset: 2px; }

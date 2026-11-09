@@ -54,17 +54,10 @@ export type Classification = {
   cleaned: string; // text with #hashtags / !priority markers stripped
 };
 
-export function classify(text: string, projects: ProjectRef[], learned: LearnedKeywords = {}): Classification {
-  // 1. Explicit hashtags: "#home" or "#side-project" → tags (and project if it matches one).
-  const hashtags = [...text.matchAll(/(^|\s)#([\w-]+)/g)].map((m) => m[2].toLowerCase());
-  let cleaned = text.replace(/(^|\s)#[\w-]+/g, " ");
-
-  const priority: 1 | 2 | 3 = URGENT.test(cleaned) ? 1 : LOW.test(cleaned) ? 3 : 2;
-  cleaned = cleaned.replace(/!+/g, " ").replace(/\b(asap|urgent(ly)?|low priority|no rush)\b/gi, " ").replace(/\s+/g, " ").trim();
-
+/** Add project scores for a piece of text. `m` scales how much it counts (a brief counts less than the task itself). */
+function scoreInto(scores: Map<number, number>, text: string, hashtags: string[], projects: ProjectRef[], learned: LearnedKeywords, m: number) {
   const byLower = new Map(projects.map((p) => [p.name.toLowerCase(), p]));
-  const scores = new Map<number, number>();
-  const add = (id: number, w: number) => scores.set(id, (scores.get(id) ?? 0) + w);
+  const add = (id: number, w: number) => scores.set(id, (scores.get(id) ?? 0) + w * m);
 
   // Hashtag naming a project wins outright.
   for (const h of hashtags) {
@@ -72,22 +65,46 @@ export function classify(text: string, projects: ProjectRef[], learned: LearnedK
     if (p) add(p.id, 100);
   }
   // Project name typed in the text ("THEO: fix login") is a strong hint.
-  const lowerText = normalize(cleaned);
-  for (const p of projects) if (lowerText.includes(p.name.toLowerCase())) add(p.id, 5);
+  const lowerText = " " + normalize(text) + " ";
+  for (const p of projects) if (lowerText.includes(" " + normalize(p.name) + " ")) add(p.id, 5);
 
-  const words = keywords(cleaned);
+  const words = keywords(text);
   // Built-in vocabulary.
   for (const [name, vocab] of Object.entries(VOCAB)) {
     const p = byLower.get(name.toLowerCase());
     if (!p) continue;
     for (const w of words) if (vocab.some((v) => w === v || w.startsWith(v) || stem(v) === w)) add(p.id, 1);
   }
-  // What THEO has learned from you weighs more than the defaults.
+  // What THEO has learned from you (incl. 👍/👎) weighs more than the defaults. Negative weights push away.
+  const ids = new Set(projects.map((p) => p.id));
   for (const w of words) {
     const row = learned[w];
     if (!row) continue;
-    for (const [pid, weight] of Object.entries(row)) if (byLower.size && projects.some((p) => p.id === Number(pid))) add(Number(pid), weight * 1.5);
+    for (const [pid, weight] of Object.entries(row)) if (ids.has(Number(pid))) add(Number(pid), weight * 1.5);
   }
+}
+
+const hashtagsOf = (t: string) => [...t.matchAll(/(^|\s)#([\w-]+)/g)].map((m) => m[2].toLowerCase());
+
+/**
+ * @param brief optional context you give for the whole batch ("all for my candle business,
+ *              due before the Christmas market"). It nudges every task, but the task's own words win.
+ */
+export function classify(text: string, projects: ProjectRef[], learned: LearnedKeywords = {}, brief = ""): Classification {
+  // 1. Explicit hashtags: "#home" or "#side-project" → tags (and project if it matches one).
+  const hashtags = hashtagsOf(text);
+  let cleaned = text.replace(/(^|\s)#[\w-]+/g, " ");
+
+  const briefTags = hashtagsOf(brief);
+  const briefClean = brief.replace(/(^|\s)#[\w-]+/g, " ");
+  let priority: 1 | 2 | 3 = URGENT.test(cleaned) ? 1 : LOW.test(cleaned) ? 3 : 2;
+  if (priority === 2 && brief) priority = URGENT.test(briefClean) ? 1 : LOW.test(briefClean) ? 3 : 2;
+  cleaned = cleaned.replace(/!+/g, " ").replace(/\b(asap|urgent(ly)?|low priority|no rush)\b/gi, " ").replace(/\s+/g, " ").trim();
+
+  const byLower = new Map(projects.map((p) => [p.name.toLowerCase(), p]));
+  const scores = new Map<number, number>();
+  scoreInto(scores, cleaned, hashtags, projects, learned, 1);
+  if (brief.trim()) scoreInto(scores, briefClean, briefTags, projects, learned, 0.6);
 
   let best: number | null = null, bestScore = 0, total = 0;
   for (const [id, s] of scores) {
@@ -96,7 +113,7 @@ export function classify(text: string, projects: ProjectRef[], learned: LearnedK
   }
   const project = best != null ? projects.find((p) => p.id === best)! : null;
 
-  const tags = new Set(hashtags.filter((h) => !byLower.has(h)));
+  const tags = new Set([...hashtags, ...briefTags].filter((h) => !byLower.has(h)));
   for (const [re, tag] of ACTION_TAGS) if (re.test(cleaned)) tags.add(tag);
   if (priority === 1) tags.add("urgent");
 

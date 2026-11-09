@@ -28,19 +28,43 @@ export async function ensureProject(name: string, color = "blue"): Promise<numbe
   return rows[0].id;
 }
 
+export async function updateProject(id: number, patch: { name?: string; color?: string }) {
+  const rows = await q<Project>(
+    `UPDATE projects SET name = COALESCE($2, name), color = COALESCE($3, color) WHERE id = $1 RETURNING id, name, color`,
+    [id, patch.name ?? null, patch.color ?? null]);
+  return rows[0] ?? null;
+}
+
+/** Tasks in a deleted project move to the Inbox (project_id → NULL); its learned words are dropped. */
+export function deleteProject(id: number) {
+  return q(`DELETE FROM projects WHERE id = $1`, [id]);
+}
+
 // ── Brain context (what THEO has learned) ────────────────────────
 export async function loadBrainContext(): Promise<BrainContext> {
   const [projects, kw, plans, leads] = await Promise.all([
     q<{ id: number; name: string }>(`SELECT id, name FROM projects`),
-    q<{ keyword: string; project_id: number; weight: number }>(`SELECT keyword, project_id, weight FROM learned_keywords WHERE weight > 0`),
+    q<{ keyword: string; project_id: number; weight: number }>(`SELECT keyword, project_id, weight FROM learned_keywords WHERE weight <> 0`),
     q<LearnedPlan>(`SELECT kind, key_words, title, steps, uses FROM learned_plans ORDER BY uses DESC, updated_at DESC LIMIT 500`),
-    // Median days from "created" to "done" per project, from your last 50 finished tasks there.
+    // Your typical lead time per project: median days from "added" to "done" over your last 50 finished
+    // tasks there; if there aren't enough yet, the dates you picked when correcting THEO (👎 / date edits).
     q<{ project_id: number; days: number }>(`
-      SELECT project_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM completed_at - created_at) / 86400) AS days
-      FROM (SELECT project_id, completed_at, created_at,
-                   row_number() OVER (PARTITION BY project_id ORDER BY completed_at DESC) rn
-            FROM tasks WHERE status = 'done' AND completed_at IS NOT NULL AND project_id IS NOT NULL AND goal_id IS NULL) x
-      WHERE rn <= 50 GROUP BY project_id HAVING count(*) >= 3`),
+      WITH done AS (
+        SELECT project_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM completed_at - created_at) / 86400) AS days
+        FROM (SELECT project_id, completed_at, created_at,
+                     row_number() OVER (PARTITION BY project_id ORDER BY completed_at DESC) rn
+              FROM tasks WHERE status = 'done' AND completed_at IS NOT NULL AND project_id IS NOT NULL AND goal_id IS NULL) x
+        WHERE rn <= 50 GROUP BY project_id HAVING count(*) >= 3),
+      picked AS (
+        SELECT chosen_project_id AS project_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY lead_days) AS days
+        FROM (SELECT chosen_project_id, lead_days, row_number() OVER (PARTITION BY chosen_project_id ORDER BY created_at DESC) rn
+              FROM task_feedback
+              WHERE chosen_project_id IS NOT NULL AND lead_days IS NOT NULL AND lead_days >= 0
+                AND (chosen_due IS DISTINCT FROM suggested_due OR 'due' = ANY(aspects))) y
+        WHERE rn <= 30 GROUP BY chosen_project_id HAVING count(*) >= 2)
+      SELECT project_id, days FROM done
+      UNION ALL
+      SELECT project_id, days FROM picked WHERE project_id NOT IN (SELECT project_id FROM done)`),
   ]);
   const learnedKeywords: BrainContext["learnedKeywords"] = {};
   for (const r of kw) (learnedKeywords[r.keyword] ??= {})[r.project_id] = r.weight;
@@ -53,15 +77,14 @@ export async function loadBrainContext(): Promise<BrainContext> {
 export async function learnKeywords(title: string, projectId: number, delta = 1, fromProjectId?: number | null) {
   const words = keywords(title).slice(0, 12);
   if (!words.length) return;
-  await q(
+  // Weights are clamped to -5..20; negatives actively steer away from a project.
+  const bump = (pid: number, d: number) => q(
     `INSERT INTO learned_keywords (keyword, project_id, weight)
-     SELECT w, $2, $3 FROM unnest($1::text[]) AS w
-     ON CONFLICT (keyword, project_id) DO UPDATE SET weight = LEAST(learned_keywords.weight + $3, 20)`,
-    [words, projectId, delta]);
-  if (fromProjectId && fromProjectId !== projectId) {
-    await q(`UPDATE learned_keywords SET weight = GREATEST(weight - $3, -5) WHERE project_id = $2 AND keyword = ANY($1::text[])`,
-      [words, fromProjectId, delta]);
-  }
+     SELECT w, $2, GREATEST(LEAST($3::real, 20), -5) FROM unnest($1::text[]) AS w
+     ON CONFLICT (keyword, project_id) DO UPDATE SET weight = GREATEST(LEAST(learned_keywords.weight + $3::real, 20), -5)`,
+    [words, pid, d]);
+  await bump(projectId, delta);
+  if (fromProjectId && fromProjectId !== projectId) await bump(fromProjectId, -Math.abs(delta));
 }
 
 /** Remember a step list you shaped yourself so similar tasks/goals reuse it. */
@@ -75,6 +98,53 @@ export async function learnPlan(kind: "task" | "goal", title: string, steps: unk
       [existing[0].id, JSON.stringify(steps), title]);
   } else {
     await q(`INSERT INTO learned_plans (kind, key_words, title, steps) VALUES ($1, $2, $3, $4)`, [kind, kw, title, JSON.stringify(steps)]);
+  }
+}
+
+/** Down-rank a task step plan you gave 👎 (removes it once it has no credit left). */
+async function forgetPlan(kind: "task" | "goal", title: string) {
+  const kw = keywords(title);
+  if (!kw.length) return;
+  await q(`UPDATE learned_plans SET uses = uses - 2 WHERE kind = $1 AND key_words && $2::text[] AND
+           (SELECT count(*) FROM unnest(key_words) k WHERE k = ANY($2::text[]))::float / GREATEST(array_length(key_words, 1), 1) >= 0.5`, [kind, kw]);
+  await q(`DELETE FROM learned_plans WHERE uses <= 0`);
+}
+
+export type Feedback = {
+  vote: "up" | "down" | null;
+  aspects: string[];        // what was off: project | due | steps | title
+  brief: string;
+  suggested: { projectId: number | null; dueDate: string | null; steps: string[] };
+};
+
+/**
+ * Turn your reaction to THEO's suggestion into learning:
+ *  • changed the project → move the words from the old project to the new one
+ *  • 👍 → reinforce the project and remember the steps as a good template
+ *  • 👎 project → push the words away from the suggested project
+ *  • 👎 steps → forget the reused plan; if you rewrote them, remember your version
+ *  • any date change / 👎 due → logged so typical lead times adapt
+ */
+export async function recordFeedback(taskId: number, title: string, final: { projectId: number | null; dueDate: string | null; steps: string[] }, fb: Feedback, today: string) {
+  const s = fb.suggested;
+  const projectChanged = s.projectId !== final.projectId;
+  const stepsChanged = s.steps.map((x) => x.trim()).filter(Boolean).join("\n") !== final.steps.map((x) => x.trim()).filter(Boolean).join("\n");
+
+  if (final.projectId && projectChanged) await learnKeywords(title, final.projectId, 2, s.projectId);
+  else if (s.projectId && fb.vote === "down" && fb.aspects.includes("project")) await learnKeywords(title, s.projectId, -1.5);
+  if (fb.vote === "up" && final.projectId) await learnKeywords(title, final.projectId, 1);
+
+  const cleanSteps = final.steps.map((x) => x.trim()).filter(Boolean);
+  if (stepsChanged && cleanSteps.length) await learnPlan("task", title, cleanSteps.map((text) => ({ text })));
+  else if (fb.vote === "up" && cleanSteps.length) await learnPlan("task", title, cleanSteps.map((text) => ({ text })));
+  else if (fb.vote === "down" && fb.aspects.includes("steps")) await forgetPlan("task", title);
+
+  const dueChanged = (s.dueDate ?? null) !== (final.dueDate ?? null);
+  if (fb.vote || projectChanged || dueChanged || fb.brief) {
+    await q(
+      `INSERT INTO task_feedback (task_id, vote, aspects, brief, suggested_project_id, chosen_project_id, suggested_due, chosen_due, lead_days)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $8::date IS NULL THEN NULL ELSE $8::date - $9::date END)`,
+      [taskId, fb.vote, fb.aspects, fb.brief.slice(0, 2000), s.projectId, final.projectId, s.dueDate, final.dueDate, today]);
   }
 }
 

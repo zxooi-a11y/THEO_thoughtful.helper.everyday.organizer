@@ -3,7 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "THEO · Task calendar",
+  title: "THEO · Thoughtful Helper & Everyday Organizer",
   description: "Thoughtful Helper for Everyday Organizing — calendar, tasks and goal planning in one.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#fdfcfa" };

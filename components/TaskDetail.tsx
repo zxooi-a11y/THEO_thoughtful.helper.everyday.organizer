@@ -4,6 +4,7 @@ import { colorOf } from "@/lib/colors";
 import type { Project, Step, Task } from "@/lib/types";
 import { addDays } from "@/lib/brain/dates";
 import { api, relDue, timeAgo } from "./client";
+import ProjectSelect from "./ProjectSelect";
 import { CalendarIcon, ClockIcon, FolderIcon, PlusIcon, XIcon } from "./Icons";
 
 type Props = { task: Task; projects: Project[]; today: string; onChange: (t: Task | null) => void };
@@ -77,10 +78,8 @@ export default function TaskDetail({ task, projects, today, onChange }: Props) {
             onBlur={() => estimate !== task.estimate && patch({ estimate })} />
         </div>
         <div className="row"><FolderIcon size={18} />
-          <select className="bare" value={task.project_id ?? ""} onChange={(e) => patch({ project_id: e.target.value ? Number(e.target.value) : null })} title="Moving a task teaches THEO">
-            <option value="">Inbox</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          <ProjectSelect className="bare" projects={projects} value={task.project_id} title="Moving a task teaches THEO"
+            onChange={(id) => patch({ project_id: id })} />
         </div>
       </div>
 

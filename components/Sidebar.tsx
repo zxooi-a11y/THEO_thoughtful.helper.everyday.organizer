@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Logo from "./Logo";
 import { ArchiveIcon, CalendarIcon, ChartIcon, FolderIcon, TargetIcon } from "./Icons";
 
 const NAV = [
@@ -16,7 +17,7 @@ export default function Sidebar() {
   if (path === "/login") return null;
   return (
     <aside className="sidebar">
-      <div className="logo">theo<span>.organizer</span></div>
+      <Logo />
       <nav className="nav">
         {NAV.map(({ href, label, Icon }) => (
           <Link key={href} href={href} className={path === href ? "active" : ""} title={label}>
