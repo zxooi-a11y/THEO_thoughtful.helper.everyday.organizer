@@ -8,7 +8,11 @@ export type Stats = {
 };
 
 export default function KpiCards({ stats }: { stats: Stats | null }) {
-  const k = stats?.kpi;
+  // Coerce to numbers so a missing value never shows as "NaN".
+  const ZERO: Stats["kpi"] = { done_week: 0, due_week: 0, done_month: 0, done_prev_month: 0, overdue: 0, goal_total: 0, goal_done: 0, open_total: 0 };
+  const k: Stats["kpi"] | undefined = stats
+    ? (Object.fromEntries(Object.keys(ZERO).map((key) => [key, Number((stats.kpi as Record<string, unknown> | undefined)?.[key]) || 0])) as Stats["kpi"])
+    : undefined;
   const days = stats?.perDay ?? [];
   // Activity = share of this week's due work you actually finished (overdue drags it down).
   const activity = k ? (k.done_week + k.overdue === 0 ? 100 : Math.round((k.done_week / (k.done_week + k.overdue)) * 100)) : 0;

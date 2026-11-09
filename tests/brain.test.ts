@@ -85,3 +85,14 @@ test("negative learned weights push a project away", () => {
   const learned: BrainContext = { ...ctx, learnedKeywords: { groceri: { 5: -3 }, grocery: { 5: -3 } } };
   assert.notEqual(analyzeTask("buy groceries", TODAY, learned).projectName, "Errands");
 });
+
+test("event types are detected from the title", async () => {
+  const { detectKind } = await import("../lib/events.ts");
+  assert.equal(detectKind("Sarah & Tom's wedding"), "wedding");
+  assert.equal(detectKind("Bali holiday"), "holiday");
+  assert.equal(detectKind("Google interview"), "interview");
+  assert.equal(detectKind("Mum's 60th birthday party"), "birthday");
+  assert.equal(detectKind("AWS Summit New York"), "conference");
+  assert.equal(detectKind("Weekend road trip to Penang"), "trip");
+  assert.equal(detectKind("Coffee with Jo"), "other");
+});

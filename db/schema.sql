@@ -85,6 +85,22 @@ CREATE TABLE IF NOT EXISTS task_feedback (
 );
 CREATE INDEX IF NOT EXISTS task_feedback_project_idx ON task_feedback (chosen_project_id);
 
+-- Life events: weddings, trips, interviews, birthdays… shown on the Events page and the calendar.
+CREATE TABLE IF NOT EXISTS events (
+  id          SERIAL PRIMARY KEY,
+  title       TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'other',   -- see lib/events.ts
+  start_date  DATE NOT NULL,
+  end_date    DATE,                            -- NULL = single day
+  start_time  TEXT NOT NULL DEFAULT '',        -- optional "14:30"
+  location    TEXT NOT NULL DEFAULT '',
+  url         TEXT NOT NULL DEFAULT '',
+  notes       TEXT NOT NULL DEFAULT '',
+  favorite    BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_date);
+
 -- Seed a few starter projects (ignored if they already exist).
 INSERT INTO projects (name, color) VALUES
   ('Home', 'orange'), ('Health', 'green'), ('Finance', 'yellow'),

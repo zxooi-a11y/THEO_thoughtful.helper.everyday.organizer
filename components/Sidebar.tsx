@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Logo from "./Logo";
-import { ArchiveIcon, CalendarIcon, ChartIcon, FolderIcon, TargetIcon } from "./Icons";
+import { ArchiveIcon, CalendarIcon, ChartIcon, FolderIcon, PartyIcon, TargetIcon } from "./Icons";
 
 const NAV = [
   { href: "/", label: "Task calendar", Icon: CalendarIcon },
+  { href: "/events", label: "Events", Icon: PartyIcon },
   { href: "/plan", label: "Goal planner", Icon: TargetIcon },
   { href: "/projects", label: "Projects", Icon: FolderIcon },
   { href: "/archive", label: "Archive", Icon: ArchiveIcon },

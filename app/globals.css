@@ -119,14 +119,14 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
 .side-col { display: flex; flex-direction: column; gap: 22px; position: sticky; top: 24px; }
 
 /* KPI */
-.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 18px 0 40px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 18px; margin: 18px 0 40px; }
 .kpi { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; min-height: 120px; }
-.kpi .label { white-space: nowrap; font-size: 11px; font-weight: 700; color: #6e6a63; }
+.kpi .label { font-size: 11px; font-weight: 700; color: #6e6a63; }
 .kpi .value { font-size: 36px; font-weight: 800; letter-spacing: -0.03em; margin-top: 10px; }
 .kpi .value small { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0; }
 .kpi .delta { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; margin-top: 6px; }
 .kpi .delta i { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
-.kpi svg { flex: none; }
+.kpi svg { flex: 0 1 auto; max-width: 42%; }
 
 /* Calendar */
 .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -252,3 +252,39 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
 .swatch { width: 22px; height: 22px; border-radius: 7px; border: 0; padding: 0; }
 .swatch.on { outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* Events (card design follows the reference: tinted date panel + details) */
+.event-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 20px; }
+.event-card {
+  display: grid; grid-template-columns: 140px minmax(0, 1fr); background: var(--card); border-radius: 18px; overflow: hidden;
+  box-shadow: var(--shadow); border: 1px solid var(--line); cursor: pointer; transition: transform .15s, box-shadow .15s; min-height: 200px;
+}
+.event-card:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(60,50,30,.05), 0 12px 28px rgba(60,50,30,.09); }
+.event-card.past { opacity: .6; }
+.ev-date { padding: 26px 20px; display: flex; flex-direction: column; align-items: flex-start; }
+.ev-month { color: var(--ev); font-weight: 800; font-size: 17px; letter-spacing: .02em; }
+.ev-day { color: var(--ev); font-weight: 800; font-size: 50px; line-height: 1.05; letter-spacing: -0.02em; margin-top: 4px; }
+.ev-rule { width: 70%; height: 2px; background: var(--ev); opacity: .6; margin: 18px 0 14px; }
+.ev-range { font-size: 13px; font-weight: 600; line-height: 1.6; color: #3b3b3b; }
+.ev-body { position: relative; padding: 26px 22px 20px 30px; display: flex; flex-direction: column; gap: 14px; }
+.ev-title { margin: 0; padding-right: 36px; font-size: 21px; font-weight: 800; line-height: 1.3; letter-spacing: -0.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ev-heart { position: absolute; top: 18px; right: 18px; border: 0; background: transparent; padding: 4px; color: var(--text); border-radius: 8px; }
+.ev-heart:hover { background: var(--soft); }
+.ev-pill { display: inline-block; padding: 5px 12px; border-radius: 7px; font-weight: 700; font-size: 13px; }
+.ev-soon { font-size: 12px; font-weight: 700; color: var(--muted); align-self: center; }
+.ev-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ev-loc { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #3b3b3b; min-width: 0; }
+.ev-loc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev-loc svg { flex: none; }
+.ev-link { color: var(--ev); padding: 4px; border-radius: 8px; display: grid; }
+.ev-link:hover { background: var(--soft); }
+.pill.on-dark { background: var(--text); color: #fff; border-color: var(--text); }
+.cell .chip.ev-chip { cursor: pointer; border-left: 3px solid currentColor; }
+@media (max-width: 860px) {
+  .event-card { grid-template-columns: 112px minmax(0, 1fr); min-height: 170px; }
+  .ev-date { padding: 20px 14px; }
+  .ev-day { font-size: 40px; }
+  .ev-body { padding: 20px 16px 16px 18px; }
+  .ev-title { font-size: 18px; }
+}

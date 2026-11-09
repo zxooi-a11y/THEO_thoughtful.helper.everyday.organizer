@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
+import { kindOf, type LifeEvent } from "@/lib/events";
 import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
@@ -22,6 +23,7 @@ export default function CalendarPage() {
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [events, setEvents] = useState<LifeEvent[]>([]);
   const [doing, setDoing] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -55,12 +57,15 @@ export default function CalendarPage() {
       const qs = new URLSearchParams({ from: days[0], to: days[days.length - 1] });
       if (search) qs.set("q", search);
       if (projectFilter) qs.set("project", projectFilter);
-      const [t, d, p, s] = await Promise.all([
+      const range = new URLSearchParams({ from: days[0], to: days[days.length - 1] });
+      const [t, d, p, s, ev] = await Promise.all([
         api<Task[]>(`/api/tasks?${qs}`),
         api<Task[]>(`/api/tasks?status=doing`),
         api<Project[]>("/api/projects"),
         api<Stats>(`/api/stats?today=${today}`),
+        api<LifeEvent[]>(`/api/events?${range}`).catch(() => [] as LifeEvent[]),
       ]);
+      setEvents(ev);
       setTasks(t); setDoing(d); setProjects(p); setStats(s); setError("");
     } catch (e) { setError((e as Error).message); }
   }, [days, search, projectFilter, today]);
@@ -72,6 +77,13 @@ export default function CalendarPage() {
     for (const t of tasks) if (t.due_date) (m.get(t.due_date) ?? m.set(t.due_date, []).get(t.due_date)!).push(t);
     return m;
   }, [tasks]);
+  const eventsByDay = useMemo(() => {
+    const m = new Map<string, LifeEvent[]>();
+    for (const e of events) {
+      for (let d = e.start_date; d <= (e.end_date ?? e.start_date); d = addDays(d, 1)) (m.get(d) ?? m.set(d, []).get(d)!).push(e);
+    }
+    return m;
+  }, [events]);
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const selected = useMemo(() => {
@@ -104,6 +116,14 @@ export default function CalendarPage() {
   const [cy, cm] = cursor.split("-").map(Number);
   const heading = view === "month" ? `${MONTH_LONG[cm - 1]} ${cy}` : view === "week" ? `Week of ${fmtDate(days[0])}` : fmtDate(cursor, true);
   const maxChips = view === "month" ? 2 : 99;
+
+  const eventChip = (e: LifeEvent) => {
+    const k = kindOf(e.kind);
+    return (
+      <a key={`e${e.id}`} href={`/events?open=${e.id}`} className="chip ev-chip" style={{ background: k.pill, color: k.accent }} title={`${k.label}: ${e.title}`}
+        onClick={(x) => x.stopPropagation()}>★ {e.title}</a>
+    );
+  };
 
   const chip = (t: Task) => {
     const c = colorOf(projectById.get(t.project_id ?? -1)?.color);
@@ -160,7 +180,19 @@ export default function CalendarPage() {
 
           {view === "day" ? (
             <div className="day-list">
-              {(byDay.get(cursor) ?? []).length === 0 && <div className="empty">Nothing due {relDue(cursor, today).toLowerCase()}. Enjoy it — or add something.</div>}
+              {(eventsByDay.get(cursor) ?? []).map((e) => {
+                const k = kindOf(e.kind);
+                return (
+                  <a key={e.id} href={`/events?open=${e.id}`} className="day-item" style={{ background: k.panel }}>
+                    <span className="chip" style={{ background: k.pill, color: k.accent }}>★ {k.label}</span>
+                    <div className="grow">
+                      <div style={{ fontWeight: 700 }}>{e.title}</div>
+                      <div className="muted small">{[e.start_time, e.location].filter(Boolean).join(" · ") || "All day"}</div>
+                    </div>
+                  </a>
+                );
+              })}
+              {(byDay.get(cursor) ?? []).length === 0 && (eventsByDay.get(cursor) ?? []).length === 0 && <div className="empty">Nothing due {relDue(cursor, today).toLowerCase()}. Enjoy it — or add something.</div>}
               {(byDay.get(cursor) ?? []).map((t) => {
                 const p = projectById.get(t.project_id ?? -1); const c = colorOf(p?.color);
                 const done = t.steps.filter((s) => s.done).length;
@@ -187,6 +219,7 @@ export default function CalendarPage() {
                     onDragLeave={() => setDragOver(null)}
                     onDrop={(e) => { e.preventDefault(); setDragOver(null); const id = Number(e.dataTransfer.getData("text/plain")); if (id) moveTask(id, d); }}>
                     <div className="dhead"><span>{WEEKDAY[(toDate(d).getUTCDay() + 6) % 7]}</span><b>{d.slice(8)}</b></div>
+                    {(eventsByDay.get(d) ?? []).map(eventChip)}
                     {show.map(chip)}
                     {list.length > show.length && <button className="more" onClick={() => setExpanded(d)}>+{list.length - show.length}</button>}
                     <button className="add-here" title="Add tasks for this day" onClick={() => setAdding({ date: d })}>+</button>

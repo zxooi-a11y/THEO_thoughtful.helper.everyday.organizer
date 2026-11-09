@@ -26,7 +26,11 @@ export default function PlanPage() {
   const [error, setError] = useState("");
 
   const loadGoals = useCallback(() => api<GoalRow[]>("/api/goals").then(setGoals).catch((e) => setError(e.message)), []);
-  useEffect(() => { setToday(localToday()); loadGoals(); }, [loadGoals]);
+  useEffect(() => {
+    setToday(localToday()); loadGoals();
+    const g = new URLSearchParams(window.location.search).get("goal");
+    if (g) setGoal(g.slice(0, 200));
+  }, [loadGoals]);
 
   async function draft(g = goal) {
     if (!g.trim()) return;
