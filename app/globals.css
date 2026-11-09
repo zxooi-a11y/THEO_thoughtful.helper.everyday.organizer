@@ -82,6 +82,7 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
   width: 100%; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 9px 12px; outline: none;
 }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input::placeholder, .textarea::placeholder { color: var(--muted-2); }
 .textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
 .bare { border: 0; background: transparent; outline: none; width: 100%; padding: 0; }
 .chip {
