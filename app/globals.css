@@ -292,3 +292,28 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
   .ev-body { padding: 20px 16px 16px 18px; }
   .ev-title { font-size: 18px; }
 }
+
+/* ── Phone-friendly forms & popups ───────────── */
+.modal, .modal * { min-width: 0; }
+.modal { overflow-x: hidden; max-width: 100%; }
+.input, .select, .textarea { max-width: 100%; min-width: 0; }
+input[type="date"], input[type="time"] {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; max-width: 100%;
+  min-height: 42px; text-align: left; line-height: 1.2;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+.form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
+.form-row > * { flex: 1 1 180px; min-width: 0; }
+@media (max-width: 860px) {
+  .backdrop { padding: 10px; align-items: end; }
+  .modal { padding: 20px 16px; border-radius: 18px; max-height: 94vh; }
+  .modal h2 { font-size: 20px; }
+  /* Date / Until / Time and similar groups: two tidy columns, first field full width */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row > * { flex: none; width: auto !important; min-width: 0 !important; }
+  .form-row > :first-child:nth-last-child(3), .form-row > :first-child:nth-last-child(1) { grid-column: 1 / -1; }
+  .form-row.stack-mobile { grid-template-columns: 1fr; }
+  .draft { position: relative; }
+  .draft > .icon-btn { position: absolute; top: 6px; right: 6px; }
+  .draft > :first-child { padding-right: 26px; }
+}

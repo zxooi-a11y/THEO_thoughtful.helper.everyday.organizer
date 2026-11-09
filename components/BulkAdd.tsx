@@ -142,13 +142,13 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                 <p className="muted" style={{ margin: 0 }}>Describe the task. Leave the other fields on <b>Auto</b> and THEO fills them in, or set them yourself.</p>
                 <input className="input" style={{ padding: 14, fontSize: 16 }} autoFocus placeholder="e.g. Call the plumber about the leak by Thursday"
                   value={single.title} onChange={(e) => setSingle({ ...single, title: e.target.value })} />
-                <div className="row wrap" style={{ alignItems: "flex-start" }}>
-                  <label className="grow stack" style={{ gap: 6, minWidth: 180 }}>
+                <div className="form-row stack-mobile">
+                  <label className="stack" style={{ gap: 6 }}>
                     <span className="small" style={{ fontWeight: 700 }}>Project</span>
                     <ProjectSelect projects={projects} value={single.projectId} emptyLabel="Auto (let THEO decide)" onCreated={addProject}
                       onChange={(id) => setSingle((s) => ({ ...s, projectId: id }))} />
                   </label>
-                  <label className="grow stack" style={{ gap: 6, minWidth: 180 }}>
+                  <label className="stack" style={{ gap: 6 }}>
                     <span className="small" style={{ fontWeight: 700 }}>Due date</span>
                     <div className="row" style={{ gap: 6 }}>
                       <input type="date" className="input" value={single.dueDate} onChange={(e) => setSingle({ ...single, dueDate: e.target.value })} />

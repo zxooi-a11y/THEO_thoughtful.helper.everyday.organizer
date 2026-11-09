@@ -135,27 +135,27 @@ export default function EventsPage() {
               </div>
             </div>
 
-            <div className="row wrap" style={{ alignItems: "flex-start" }}>
-              <label className="grow stack" style={{ gap: 6, minWidth: 150 }}>
+            <div className="form-row">
+              <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Date</span>
                 <input type="date" className="input" required value={draft.start_date} onChange={(e) => upd({ start_date: e.target.value })} />
               </label>
-              <label className="grow stack" style={{ gap: 6, minWidth: 150 }}>
+              <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Until <span className="muted">(multi-day)</span></span>
                 <input type="date" className="input" min={draft.start_date} value={draft.end_date} onChange={(e) => upd({ end_date: e.target.value })} />
               </label>
-              <label className="stack" style={{ gap: 6, width: 130 }}>
+              <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Time</span>
                 <input type="time" className="input" value={draft.start_time} onChange={(e) => upd({ start_time: e.target.value })} />
               </label>
             </div>
 
-            <div className="row wrap">
-              <label className="grow stack" style={{ gap: 6, minWidth: 200 }}>
+            <div className="form-row stack-mobile">
+              <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Location</span>
                 <input className="input" placeholder="e.g. Kuala Lumpur, Malaysia" value={draft.location} onChange={(e) => upd({ location: e.target.value })} />
               </label>
-              <label className="grow stack" style={{ gap: 6, minWidth: 200 }}>
+              <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Link</span>
                 <input className="input" placeholder="Invite, booking or ticket URL" value={draft.url} onChange={(e) => upd({ url: e.target.value })} />
               </label>
