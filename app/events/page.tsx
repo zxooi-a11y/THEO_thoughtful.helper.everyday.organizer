@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { detectKind, EVENT_KINDS, kindOf, type LifeEvent } from "@/lib/events";
+import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from "@/lib/events";
 import type { EventHints } from "@/lib/brain";
 import type { FileMeta } from "@/lib/types";
 import EventCard from "@/components/EventCard";
@@ -8,9 +8,9 @@ import { api, fmtDate, localToday } from "@/components/client";
 import { FileDrop, FileList, uploadFile } from "@/components/files";
 import { PlusIcon, XIcon } from "@/components/Icons";
 
-type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; location: string; url: string; notes: string; favorite: boolean; files: FileMeta[] };
+type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; end_time: string; location: string; url: string; notes: string; favorite: boolean; files: FileMeta[] };
 
-const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", location: "", url: "", notes: "", favorite: false, files: [] });
+const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", end_time: "", location: "", url: "", notes: "", favorite: false, files: [] });
 
 export default function EventsPage() {
   const [today, setToday] = useState("");
@@ -46,7 +46,7 @@ export default function EventsPage() {
     if (!b) return a;
     if (!a) return b;
     const useB = !!b.date && (!a.date || b.date.value < a.date.value);
-    return { kind: a.kind ?? b.kind, url: a.url ?? b.url, date: useB ? b.date : a.date, time: useB ? b.time : a.time };
+    return { kind: a.kind ?? b.kind, url: a.url ?? b.url, date: useB ? b.date : a.date, time: useB ? b.time : a.time, endTime: useB ? b.endTime : a.endTime };
   };
 
   async function addFiles(picked: File[]) {
@@ -85,7 +85,7 @@ export default function EventsPage() {
     upd({
       ...(hints.kind ? { kind: hints.kind, autoKind: false } : {}),
       ...(hints.date ? { start_date: hints.date.value } : {}),
-      ...(hints.time ? { start_time: hints.time } : {}),
+      ...(hints.time ? { start_time: hints.time, end_time: hints.endTime ?? "" } : {}),
       ...(hints.url && !draft?.url ? { url: hints.url } : {}),
     });
     setHints(null);
@@ -93,7 +93,7 @@ export default function EventsPage() {
 
   function openEdit(e: LifeEvent) {
     setError("");
-    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, location: e.location, url: e.url, notes: e.notes, favorite: e.favorite, files: e.files ?? [] });
+    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, end_time: e.end_time ?? "", location: e.location, url: e.url, notes: e.notes, favorite: e.favorite, files: e.files ?? [] });
   }
 
   async function save() {
@@ -123,6 +123,7 @@ export default function EventsPage() {
   const upcoming = shown.filter((e) => (e.end_date ?? e.start_date) >= today);
   const past = shown.filter((e) => (e.end_date ?? e.start_date) < today).reverse();
   const kindsUsed = EVENT_KINDS.filter((k) => events.some((e) => e.kind === k.key));
+  const timeIssue = draft ? endTimeProblem(draft.start_time, draft.end_time, draft.end_date) : "";
   const upd = (p: Partial<Draft>) => setDraft((d) => d && { ...d, ...p });
 
   return (
@@ -200,14 +201,25 @@ export default function EventsPage() {
                 <input type="date" className="input" required value={draft.start_date} onChange={(e) => upd({ start_date: e.target.value })} />
               </label>
               <label className="stack" style={{ gap: 6 }}>
-                <span className="small" style={{ fontWeight: 700 }}>Until <span className="muted">(multi-day)</span></span>
+                <span className="small" style={{ fontWeight: 700 }}>End date <span className="muted">(multi-day)</span></span>
                 <input type="date" className="input" min={draft.start_date} value={draft.end_date} onChange={(e) => upd({ end_date: e.target.value })} />
               </label>
+            </div>
+
+            <div className="form-row">
               <label className="stack" style={{ gap: 6 }}>
-                <span className="small" style={{ fontWeight: 700 }}>Time</span>
+                <span className="small" style={{ fontWeight: 700 }}>Start time</span>
                 <input type="time" className="input" value={draft.start_time} onChange={(e) => upd({ start_time: e.target.value })} />
               </label>
+              <label className="stack" style={{ gap: 6 }}>
+                <span className="row between" style={{ minHeight: 22 }}>
+                  <span className="small" style={{ fontWeight: 700 }}>End time</span>
+                  {(draft.start_time || draft.end_time) && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => upd({ start_time: "", end_time: "" })}>All day</button>}
+                </span>
+                <input type="time" className="input" value={draft.end_time} onChange={(e) => upd({ end_time: e.target.value })} />
+              </label>
             </div>
+            {timeIssue && <div className="err" role="alert">{timeIssue}</div>}
 
             <div className="form-row stack-mobile">
               <label className="stack" style={{ gap: 6 }}>
@@ -235,7 +247,7 @@ export default function EventsPage() {
                   <b>THEO found in your file:</b>
                   <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                     {hints.kind && <li>Type: <b>{kindOf(hints.kind).label}</b></li>}
-                    {hints.date && <li>Date: <b>{fmtDate(hints.date.value, true)}</b>{hints.time ? <> at <b>{hints.time}</b></> : null} <span className="muted">({hints.date.file})</span></li>}
+                    {hints.date && <li>Date: <b>{fmtDate(hints.date.value, true)}</b>{hints.time ? <> at <b>{hints.time}{hints.endTime ? ` – ${hints.endTime}` : ""}</b></> : null} <span className="muted">({hints.date.file})</span></li>}
                     {hints.url && <li style={{ wordBreak: "break-all" }}>Link: {hints.url}{draft.url ? <span className="muted"> (you already have one, so it won&apos;t be replaced)</span> : null}</li>}
                   </ul>
                   <div className="row" style={{ justifyContent: "flex-end" }}>
@@ -257,7 +269,7 @@ export default function EventsPage() {
               </div>
               <div className="row">
                 <button type="button" className="btn" onClick={closeDraft}>Cancel</button>
-                <button className="btn primary" disabled={busy || !draft.title.trim() || !draft.start_date}>{busy ? "Saving…" : draft.id ? "Save" : "Add event"}</button>
+                <button className="btn primary" disabled={busy || !draft.title.trim() || !draft.start_date || !!timeIssue}>{busy ? "Saving…" : draft.id ? "Save" : "Add event"}</button>
               </div>
             </div>
           </form>

@@ -108,28 +108,47 @@ export type EventHints = {
   date: { value: string; file: string } | null;
   /** 24h "HH:MM" */
   time: string | null;
+  /** 24h "HH:MM", when the file gives a range such as "4:00 – 6:00 PM" */
+  endTime: string | null;
   url: string | null;
 };
 
 // Words that mark a date as a deadline for something else (RSVP, payment…) rather than the event itself.
 const NOT_EVENT_DATE = /\b(rsvp|reply|respond|confirm|deadline|due|payable|pay by|book by|register by|by|before|until|expires?)\b[^.\n]{0,25}$/i;
 
-function findTime(text: string, around: number): string | null {
-  const win = text.slice(Math.max(0, around - 40), around + 120);
-  const m = /\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)\b/i.exec(win) ?? /\b([01]?\d|2[0-3]):([0-5]\d)()\b/.exec(win);
-  if (!m) return null;
-  let h = +m[1];
-  const min = m[2] ? +m[2] : 0;
-  const ap = (m[3] ?? "").toLowerCase();
-  if (ap === "pm" && h < 12) h += 12;
-  if (ap === "am" && h === 12) h = 0;
-  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+const T = String.raw`(1[0-2]|0?[1-9]|1[3-9]|2[0-3]|0?0)(?::([0-5]\d))?`;
+const SEP = String.raw`\s*(?:-|–|—|to|until|till)\s*`;
+const hhmm = (h: number, m: number) => `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+const to24 = (h: number, ap: string) => (ap === "pm" && h < 12 ? h + 12 : ap === "am" && h === 12 ? 0 : h);
+
+/** Finds a start time (and end time, for ranges like "4–6 PM" or "16:00 to 18:30") near a position. */
+function findTimes(text: string, around: number): { start: string; end: string | null } | null {
+  const win = text.slice(Math.max(0, around - 40), around + 140);
+
+  // Range with am/pm on the end (and optionally the start): "4 – 6 PM", "10am to 2pm", "4:30pm-6pm"
+  const r = new RegExp(`\\b${T}\\s?(am|pm)?${SEP}${T}\\s?(am|pm)\\b`, "i").exec(win);
+  if (r) {
+    const [h1, m1, ap1, h2, m2, ap2] = [+r[1], r[2] ? +r[2] : 0, (r[3] ?? "").toLowerCase(), +r[4], r[5] ? +r[5] : 0, r[6].toLowerCase()];
+    const endH = to24(h2, ap2);
+    let startH = to24(h1, ap1 || ap2);
+    if (!ap1 && startH > endH) startH = to24(h1, ap2 === "pm" ? "am" : "pm"); // "11 – 1 PM" → 11am to 1pm
+    return { start: hhmm(startH, m1), end: hhmm(endH, m2) };
+  }
+  // 24-hour range: "16:00 - 18:30"
+  const r24 = /\b([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|–|—|to|until|till)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i.exec(win);
+  if (r24) return { start: hhmm(+r24[1], +r24[2]), end: hhmm(+r24[3], +r24[4]) };
+
+  // Single time
+  const m = /\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)\b/i.exec(win);
+  if (m) return { start: hhmm(to24(+m[1], m[3].toLowerCase()), m[2] ? +m[2] : 0), end: null };
+  const m24 = /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(win);
+  return m24 ? { start: hhmm(+m24[1], +m24[2]), end: null } : null;
 }
 
 export function buildEventHints(docs: FileDoc[], today: string): EventHints | null {
   if (!docs.length) return null;
   let kind: string | null = null;
-  let date: EventHints["date"] = null, time: string | null = null, url: string | null = null;
+  let date: EventHints["date"] = null, time: string | null = null, endTime: string | null = null, url: string | null = null;
   let dateIsEventish = false;
 
   for (const d of docs) {
@@ -142,14 +161,14 @@ export function buildEventHints(docs: FileDoc[], today: string): EventHints | nu
       const eventish = !NOT_EVENT_DATE.test(text.slice(Math.max(0, h.index - 50), h.index));
       // Prefer dates that aren't deadlines (RSVP etc.); among equals, the earliest.
       const better = !date || (eventish && !dateIsEventish) || (eventish === dateIsEventish && h.date < date.value);
-      if (better) { date = { value: h.date, file: d.name }; dateIsEventish = eventish; time = findTime(text, h.index); }
+      if (better) { date = { value: h.date, file: d.name }; dateIsEventish = eventish; const t = findTimes(text, h.index); time = t?.start ?? null; endTime = t?.end ?? null; }
     }
     if (!url) {
       const u = /https?:\/\/[^\s)<>"'\]]+/i.exec(text);
       if (u) url = u[0].replace(/[.,;:!?]+$/, "");
     }
   }
-  return kind || date || url ? { kind, date, time, url } : null;
+  return kind || date || url ? { kind, date, time, endTime, url } : null;
 }
 
 export const _test = { explicitDates, toISO };

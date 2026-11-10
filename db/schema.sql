@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS events (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_date);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time TEXT NOT NULL DEFAULT '';   -- optional "16:30"
 
 -- Files attached to tasks. Stored in the database itself (no extra service / cost).
 -- extracted_text is what THEO reads to help the Auto choices (empty for images etc.).

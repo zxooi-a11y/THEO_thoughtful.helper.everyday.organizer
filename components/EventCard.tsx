@@ -1,5 +1,5 @@
 "use client";
-import { kindOf, type LifeEvent } from "@/lib/events";
+import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
 import { daysBetween } from "@/lib/brain/dates";
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22,10 +22,10 @@ const External = () => (
   </svg>
 );
 
-/** "Jun 24 – 25, 2025", "Jun 30 – Jul 2, 2025", or "Jun 24, 2025 · 14:30". */
+/** "Jun 24 – 25, 2025", "Jun 30 – Jul 2, 2025", or "Jun 24, 2025". Times are shown on their own lines. */
 function rangeLabel(e: LifeEvent) {
   const [y1, m1] = e.start_date.split("-").map(Number);
-  if (!e.end_date) return `${md(e.start_date)}, ${y1}${e.start_time ? ` · ${e.start_time}` : ""}`;
+  if (!e.end_date) return `${md(e.start_date)}, ${y1}`;
   const [y2, m2, d2] = e.end_date.split("-").map(Number);
   const s = md(e.start_date);
   if (y1 !== y2) return `${s}, ${y1} – ${md(e.end_date)}, ${y2}`;
@@ -48,6 +48,8 @@ export default function EventCard({ event: e, today, onFavorite, onOpen }: Props
   const [, m, d] = e.start_date.split("-").map(Number);
   const past = (e.end_date ?? e.start_date) < today;
   const soon = countdown(e, today);
+  // Single day: "16:00 – 18:30". Several days: the start time belongs to the first day, the end time to the last.
+  const times = (e.end_date ? [e.start_time && `Starts ${e.start_time}`, e.end_time && `Ends ${e.end_time}`] : [timeRange(e)]).filter(Boolean) as string[];
 
   return (
     <article className={`event-card${past ? " past" : ""}`} onClick={onOpen} style={{ ["--ev" as string]: k.accent }}>
@@ -56,6 +58,7 @@ export default function EventCard({ event: e, today, onFavorite, onOpen }: Props
         <div className="ev-day">{String(d).padStart(2, "0")}</div>
         <div className="ev-rule" />
         <div className="ev-range">{rangeLabel(e)}</div>
+        {times.map((t) => <div key={t} className="ev-range ev-time">{t}</div>)}
       </div>
       <div className="ev-body">
         <button className="ev-heart" onClick={(x) => { x.stopPropagation(); onFavorite(); }} aria-pressed={e.favorite} aria-label={e.favorite ? "Unfavourite" : "Favourite"}>

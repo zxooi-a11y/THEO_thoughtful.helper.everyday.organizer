@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
-import { kindOf, type LifeEvent } from "@/lib/events";
+import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
 import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
@@ -212,7 +212,7 @@ export default function CalendarPage() {
                     <span className="chip" style={{ background: k.pill, color: k.accent }}>★ {k.label}</span>
                     <div className="grow">
                       <div style={{ fontWeight: 700 }}>{e.title}</div>
-                      <div className="muted small">{[e.start_time, e.location].filter(Boolean).join(" · ") || "All day"}</div>
+                      <div className="muted small">{[timeRange(e), e.location].filter(Boolean).join(" · ") || "All day"}</div>
                     </div>
                   </a>
                 );

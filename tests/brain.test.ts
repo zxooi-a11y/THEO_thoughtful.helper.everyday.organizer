@@ -168,3 +168,32 @@ test("final-work links: only safe web links are accepted", async () => {
   assert.equal(isSafeLink("https://example.com"), true);
   assert.equal(isSafeLink("javascript:alert(1)"), false);
 });
+
+test("event end times: ranges are read, formatted and validated", async () => {
+  const { buildEventHints } = await import("../lib/brain/files.ts");
+  const { timeRange, endTimeProblem } = await import("../lib/events.ts");
+  const hint = (t: string) => buildEventHints([{ name: "invite.txt", text: `Join us on 12 December 2026 ${t}` }], TODAY)!;
+  const cases: [string, string, string | null][] = [
+    ["from 4 – 6 PM", "16:00", "18:00"],
+    ["4:30pm to 6:15pm", "16:30", "18:15"],
+    ["11 - 1 PM", "11:00", "13:00"],
+    ["10am until 2pm", "10:00", "14:00"],
+    ["16:00 - 18:30", "16:00", "18:30"],
+    ["at 7:30 PM", "19:30", null],
+    ["from 09:00", "09:00", null],
+  ];
+  for (const [text, start, end] of cases) {
+    const h = hint(text);
+    assert.equal(h.time, start, text);
+    assert.equal(h.endTime, end, text);
+  }
+  assert.equal(timeRange({ start_time: "16:00", end_time: "18:30" }), "16:00 – 18:30");
+  assert.equal(timeRange({ start_time: "16:00", end_time: "" }), "16:00");
+  assert.equal(timeRange({ start_time: "", end_time: "18:30" }), "until 18:30");
+  assert.equal(timeRange({ start_time: "", end_time: "" }), "");
+  assert.equal(endTimeProblem("16:00", "18:30", null), "");
+  assert.notEqual(endTimeProblem("16:00", "15:00", null), "");
+  assert.notEqual(endTimeProblem("16:00", "16:00", ""), "");
+  assert.equal(endTimeProblem("22:00", "02:00", "2026-12-13"), "");   // overnight with an end date is fine
+  assert.equal(endTimeProblem("", "02:00", null), "");               // only one time given
+});

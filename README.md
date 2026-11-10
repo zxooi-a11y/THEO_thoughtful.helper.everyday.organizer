@@ -57,6 +57,7 @@ db/schema.sql     database schema (idempotent)
 ```
 
 ## Files
+- **Event times:** events have a start time and an end time (or leave both empty for all day). A same-day event must end after it starts; for something that runs past midnight, set an end date as well. THEO reads ranges such as "4 – 6 PM" from invites too.
 - **Events too:** attach tickets, invites and bookings to an event. THEO reads the file and offers to fill in the event's type, date (it prefers the event date over an RSVP deadline), time and link with one tap, and event cards show a 📎 count.
 - Stored in your Neon database (no extra service or cost). Limit: **4 MB per file** (Vercel's free request size) and 10 files per task. Uploads stop at 350 MB total to stay inside Neon's free 0.5 GB.
 - Reading happens inside your own app; file contents are never sent to any outside service (including the optional Gemini key).

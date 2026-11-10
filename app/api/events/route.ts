@@ -1,5 +1,5 @@
 import { createEvent, listEvents } from "@/lib/eventsRepo";
-import { detectKind } from "@/lib/events";
+import { detectKind, endTimeProblem } from "@/lib/events";
 import { bad, handle, isISODate, ok } from "@/lib/http";
 import { cleanEvent } from "./clean";
 
@@ -17,6 +17,8 @@ export const POST = handle(async (req: Request) => {
   const e = cleanEvent(await req.clone().json());
   if (!e.title) return bad("Give the event a name");
   if (!e.start_date) return bad("Pick a date");
+  const timeIssue = endTimeProblem(e.start_time ?? "", e.end_time ?? "", e.end_date);
+  if (timeIssue) return bad(timeIssue);
   // No type picked → work it out from the title ("Sarah's wedding" → Wedding).
   if (!e.kind) e.kind = detectKind(e.title, `${e.location ?? ""} ${e.notes ?? ""}`);
   const body = await req.clone().json().catch(() => ({}));

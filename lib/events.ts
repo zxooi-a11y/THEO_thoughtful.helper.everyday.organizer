@@ -42,6 +42,7 @@ export type LifeEvent = {
   start_date: string;       // YYYY-MM-DD
   end_date: string | null;
   start_time: string;
+  end_time: string;
   location: string;
   url: string;
   notes: string;
@@ -49,3 +50,20 @@ export type LifeEvent = {
   created_at: string;
   files: FileMeta[];
 };
+
+/** "16:00 – 18:30", "16:00", "until 18:30" or "" (24h times as stored). */
+export function timeRange(e: Pick<LifeEvent, "start_time" | "end_time">): string {
+  if (e.start_time && e.end_time) return `${e.start_time} – ${e.end_time}`;
+  if (e.start_time) return e.start_time;
+  if (e.end_time) return `until ${e.end_time}`;
+  return "";
+}
+
+/**
+ * A same-day event must end after it starts. Overnight events need an end date, which makes any times valid.
+ * Returns an error message, or "" when fine.
+ */
+export function endTimeProblem(start_time: string, end_time: string, end_date: string | null | undefined): string {
+  if (!start_time || !end_time || end_date) return "";
+  return end_time > start_time ? "" : "The end time must be after the start time. For an event that runs past midnight, set an end date too.";
+}
