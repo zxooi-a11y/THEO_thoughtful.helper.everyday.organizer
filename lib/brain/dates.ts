@@ -40,13 +40,13 @@ function firstOfNextMonth(iso: string): string {
   const d = toDate(iso);
   return toISO(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)));
 }
-function safeDate(y: number, m: number, d: number): string | null {
+export function safeDate(y: number, m: number, d: number): string | null {
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
   return toISO(dt);
 }
 /** Same day/month this year, or next year if already passed. */
-function upcoming(today: string, m: number, d: number): string | null {
+export function upcoming(today: string, m: number, d: number): string | null {
   const y = toDate(today).getUTCFullYear();
   const thisYear = safeDate(y, m, d);
   if (thisYear && thisYear >= today) return thisYear;

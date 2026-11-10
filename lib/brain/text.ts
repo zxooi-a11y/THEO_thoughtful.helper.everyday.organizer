@@ -33,6 +33,18 @@ export function keywords(s: string): string[] {
   return [...out];
 }
 
+/** Like keywords(), but with how often each stemmed word appears (most frequent first). */
+export function keywordCounts(s: string): [string, number][] {
+  const counts = new Map<string, number>();
+  for (const raw of normalize(s).split(" ")) {
+    const w = raw.replace(/^#/, "");
+    if (w.length < 3 || STOP.has(w) || /^\d+$/.test(w)) continue;
+    const k = stem(w);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length);
+}
+
 /** Jaccard similarity of two keyword sets (0..1). */
 export function similarity(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;

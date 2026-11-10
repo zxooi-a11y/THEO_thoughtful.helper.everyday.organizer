@@ -96,3 +96,38 @@ test("event types are detected from the title", async () => {
   assert.equal(detectKind("Weekend road trip to Penang"), "trip");
   assert.equal(detectKind("Coffee with Jo"), "other");
 });
+
+test("attached files steer project, deadline, priority and steps", async () => {
+  const { buildFileContext } = await import("../lib/brain/files.ts");
+  const invoice = buildFileContext([{
+    name: "electricity-invoice.pdf",
+    text: "FINAL NOTICE. Your invoice for account 4471 is overdue.\nPlease pay by 3 December 2026 or the bank will charge a fee.\nPayment due: 2026-12-03",
+  }], TODAY)!;
+  assert.equal(invoice.deadline?.date, "2026-12-03");
+  assert.equal(invoice.deadline?.file, "electricity-invoice.pdf");
+  assert.ok(invoice.urgent);
+  assert.ok(invoice.keywords.includes("invoice"));
+
+  // A vague task + the invoice → Finance, the file's deadline, high priority
+  const d = analyzeTask("sort this out", TODAY, ctx, "", { files: invoice });
+  assert.equal(d.projectName, "Finance");
+  assert.equal(d.dueDate, "2026-12-03");
+  assert.match(d.dueReason, /electricity-invoice\.pdf/);
+  assert.equal(d.priority, 1);
+
+  // The task's own date and words still win over the file
+  assert.equal(analyzeTask("sort this out tomorrow", TODAY, ctx, "", { files: invoice }).dueDate, "2026-11-10");
+  assert.equal(analyzeTask("book dentist", TODAY, ctx, "", { files: invoice }).projectName, "Health");
+
+  // Dates in the past or without a deadline cue are ignored
+  const old = buildFileContext([{ name: "notes.txt", text: "Meeting happened on 3 Nov 2026. Lunch on 20 Dec 2026." }], TODAY)!;
+  assert.equal(old.deadline, null);
+
+  // Checklists become steps only when asked (single-task mode)
+  const plan = buildFileContext([{ name: "launch.md", text: "Launch plan\n- Write the announcement post\n- Email the customer list\n2) Update the website banner\n- ok" }], TODAY)!;
+  assert.equal(plan.checklist.length, 3);
+  assert.notEqual(analyzeTask("launch the shop", TODAY, ctx, "", { files: plan }).stepsSource, "file");
+  const withList = analyzeTask("launch the shop", TODAY, ctx, "", { files: plan, useChecklist: true });
+  assert.equal(withList.stepsSource, "file");
+  assert.equal(withList.steps[0], "Write the announcement post");
+});

@@ -1,5 +1,6 @@
 // All database access + the "learning" side effects live here.
 import { q } from "./db";
+import { deleteOrphans, linkFiles } from "./filesRepo";
 import type { BrainContext, LearnedPlan } from "./brain";
 import { keywords } from "./brain/text";
 import type { Project, Step, Task } from "./types";
@@ -9,7 +10,9 @@ const TASK_SELECT = `
          to_char(t.due_date, 'YYYY-MM-DD') AS due_date, t.due_reason, t.estimate, t.priority,
          t.status, t.archived, t.created_at, t.started_at, t.completed_at,
          COALESCE((SELECT json_agg(json_build_object('id', s.id, 'text', s.text, 'done', s.done) ORDER BY s.position)
-                   FROM task_steps s WHERE s.task_id = t.id), '[]') AS steps
+                   FROM task_steps s WHERE s.task_id = t.id), '[]') AS steps,
+         COALESCE((SELECT json_agg(json_build_object('id', f.id, 'name', f.name, 'size', f.size, 'mime', f.mime, 'readable', f.chars > 0) ORDER BY f.id)
+                   FROM task_files tf JOIN files f ON f.id = tf.file_id WHERE tf.task_id = t.id), '[]') AS files
   FROM tasks t`;
 
 // ── Projects ─────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ export function listTasks(opts: { from?: string; to?: string; search?: string; p
 
 export type NewTask = {
   title: string; notes?: string; projectId: number | null; goalId?: number | null; tags?: string[];
-  dueDate: string | null; dueReason?: string; estimate?: string; priority?: number; steps?: string[];
+  dueDate: string | null; dueReason?: string; estimate?: string; priority?: number; steps?: string[]; fileIds?: number[];
 };
 
 export async function createTask(t: NewTask, opts: { learn?: boolean } = {}): Promise<number> {
@@ -181,6 +184,7 @@ export async function createTask(t: NewTask, opts: { learn?: boolean } = {}): Pr
   if (steps.length) {
     await q(`INSERT INTO task_steps (task_id, position, text) SELECT $1, i, s FROM unnest($2::text[]) WITH ORDINALITY AS u(s, i)`, [row.id, steps]);
   }
+  if (t.fileIds?.length) await linkFiles(row.id, t.fileIds);
   if (opts.learn && t.projectId) await learnKeywords(t.title, t.projectId, 1);
   return row.id;
 }
@@ -227,8 +231,9 @@ export async function updateTask(id: number, patch: TaskPatch) {
   return getTask(id);
 }
 
-export function deleteTask(id: number) {
-  return q(`DELETE FROM tasks WHERE id = $1`, [id]);
+export async function deleteTask(id: number) {
+  await q(`DELETE FROM tasks WHERE id = $1`, [id]);
+  await deleteOrphans(24); // files that belonged only to this task
 }
 
 // ── Goals ────────────────────────────────────────────────────────
@@ -246,8 +251,9 @@ export async function createGoal(title: string, projectId: number | null) {
   return g.id;
 }
 
-export function deleteGoal(id: number) {
-  return q(`DELETE FROM goals WHERE id = $1`, [id]);
+export async function deleteGoal(id: number) {
+  await q(`DELETE FROM goals WHERE id = $1`, [id]);
+  await deleteOrphans(24);
 }
 
 // ── Analytics ────────────────────────────────────────────────────

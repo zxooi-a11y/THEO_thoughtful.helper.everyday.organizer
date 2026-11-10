@@ -101,6 +101,25 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_date);
 
+-- Files attached to tasks. Stored in the database itself (no extra service / cost).
+-- extracted_text is what THEO reads to help the Auto choices (empty for images etc.).
+CREATE TABLE IF NOT EXISTS files (
+  id              SERIAL PRIMARY KEY,
+  name            TEXT NOT NULL,
+  mime            TEXT NOT NULL DEFAULT '',
+  size            INT NOT NULL,
+  data            BYTEA NOT NULL,
+  extracted_text  TEXT NOT NULL DEFAULT '',
+  chars           INT NOT NULL DEFAULT 0,        -- length of extracted_text (cheap "can THEO read it?" check)
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS task_files (
+  task_id  INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  file_id  INT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS task_files_file_idx ON task_files (file_id);
+
 -- Seed a few starter projects (ignored if they already exist).
 INSERT INTO projects (name, color) VALUES
   ('Home', 'orange'), ('Health', 'green'), ('Finance', 'yellow'),

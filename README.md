@@ -14,6 +14,7 @@ A calendar and life-task tracker in one app. Paste a list of tasks and THEO deci
 | **Steps for every task** | Templates for calls, payments, bookings, purchases, cleaning, repairs, learning, events, writing and more. |
 | **Goal planner** | Playbooks for business, fitness, learning, moving house, saving money, launches and job hunting, plus a general framework for anything else. Each step is a dated task with its own sub-steps. |
 | **Learning** | Moving a task to another project trains the word→project weights (`learned_keywords`). Rewriting a task's steps or editing a goal plan saves your version (`learned_plans`), and similar tasks or goals reuse it. Finished tasks teach THEO your typical lead time per project. |
+| **Files on tasks** | Attach files when adding tasks (batch or single) or later from a task's panel. THEO reads text, markdown, CSV, JSON, PDF and Word files and uses them for Auto: what the task is about (project and tags), a deadline it finds ("pay by 3 December"), urgency ("final notice"), and, in Single task mode, a checklist as the steps. On an existing task it offers the deadline and checklist as one-tap suggestions. Images and scanned PDFs are stored but not read. |
 | **Calendar** | Month, week and day views. Drag a task to another day to reschedule it. Hover a day and press **+** to add tasks for that date. |
 | **Analytics** | Activity level, tasks completed per month, goal progress, a 30-day trend, and where your time goes by project. |
 
@@ -53,6 +54,12 @@ lib/repo.ts       all SQL + the learning updates
 lib/ai.ts         optional Gemini integration
 db/schema.sql     database schema (idempotent)
 ```
+
+## Files
+- Stored in your Neon database (no extra service or cost). Limit: **4 MB per file** (Vercel's free request size) and 10 files per task. Uploads stop at 350 MB total to stay inside Neon's free 0.5 GB.
+- Reading happens inside your own app; file contents are never sent to any outside service (including the optional Gemini key).
+- With `APP_PASSCODE` set, downloads need the passcode too.
+- Files nothing points to (abandoned uploads, deleted tasks) are cleaned up automatically after 24 hours.
 
 ## Free-tier limits to know
 - **Neon free:** 0.5 GB storage per project, about 190 compute hours a month, and the database sleeps when idle. That's plenty for one person; the first request after a pause takes about a second longer.

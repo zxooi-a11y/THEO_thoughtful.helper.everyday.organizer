@@ -84,13 +84,14 @@ function scoreInto(scores: Map<number, number>, text: string, hashtags: string[]
   }
 }
 
+const FILE_CAP = 0.9;
 const hashtagsOf = (t: string) => [...t.matchAll(/(^|\s)#([\w-]+)/g)].map((m) => m[2].toLowerCase());
 
 /**
  * @param brief optional context you give for the whole batch ("all for my candle business,
  *              due before the Christmas market"). It nudges every task, but the task's own words win.
  */
-export function classify(text: string, projects: ProjectRef[], learned: LearnedKeywords = {}, brief = ""): Classification {
+export function classify(text: string, projects: ProjectRef[], learned: LearnedKeywords = {}, brief = "", fileWords = ""): Classification {
   // 1. Explicit hashtags: "#home" or "#side-project" → tags (and project if it matches one).
   const hashtags = hashtagsOf(text);
   let cleaned = text.replace(/(^|\s)#[\w-]+/g, " ");
@@ -105,6 +106,15 @@ export function classify(text: string, projects: ProjectRef[], learned: LearnedK
   const scores = new Map<number, number>();
   scoreInto(scores, cleaned, hashtags, projects, learned, 1);
   if (brief.trim()) scoreInto(scores, briefClean, briefTags, projects, learned, 0.6);
+  if (fileWords.trim()) {
+    // Attached files are a hint, not a verdict: their total pull is capped below a single
+    // matching word in the task itself, so "book dentist" stays Health even if the file is an invoice.
+    const fileScores = new Map<number, number>();
+    scoreInto(fileScores, fileWords, [], projects, learned, 1);
+    const peak = Math.max(0, ...fileScores.values());
+    const k = peak > FILE_CAP ? FILE_CAP / peak : 1;
+    for (const [id, v] of fileScores) if (v > 0) scores.set(id, (scores.get(id) ?? 0) + v * k);
+  }
 
   let best: number | null = null, bestScore = 0, total = 0;
   for (const [id, s] of scores) {

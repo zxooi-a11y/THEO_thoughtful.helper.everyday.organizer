@@ -2,6 +2,8 @@
 
 export type Project = { id: number; name: string; color: string; open_count?: number; done_count?: number };
 
+export type FileMeta = { id: number; name: string; mime: string; size: number; readable: boolean };
+
 export type Step = { id?: number; text: string; done: boolean };
 
 export type Task = {
@@ -21,6 +23,7 @@ export type Task = {
   started_at: string | null;
   completed_at: string | null;
   steps: Step[];
+  files: FileMeta[];
 };
 
 export type Goal = { id: number; title: string; project_id: number | null; created_at: string; total: number; done: number };

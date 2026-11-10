@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { colorOf } from "@/lib/colors";
-import type { Project, Step, Task } from "@/lib/types";
+import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { addDays } from "@/lib/brain/dates";
 import { api, relDue, timeAgo } from "./client";
 import ProjectSelect from "./ProjectSelect";
+import { FileDrop, FileList, uploadFile, type Insights } from "./files";
 import { CalendarIcon, ClockIcon, FolderIcon, PlusIcon, XIcon } from "./Icons";
 
 type Props = { task: Task; projects: Project[]; today: string; onChange: (t: Task | null) => void };
@@ -17,8 +18,12 @@ export default function TaskDetail({ task, projects, today, onChange }: Props) {
   const [estimate, setEstimate] = useState(task.estimate);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [insights, setInsights] = useState<Insights | null>(null);
 
   useEffect(() => { setSteps(task.steps); setNotes(task.notes); setTitle(task.title); setEstimate(task.estimate); setError(""); }, [task]);
+  // Suggestions from an attached file belong to the task they were made for.
+  useEffect(() => { setInsights(null); }, [task.id]);
 
   const project = projects.find((p) => p.id === task.project_id);
   const c = colorOf(project?.color);
@@ -28,6 +33,28 @@ export default function TaskDetail({ task, projects, today, onChange }: Props) {
     try { onChange(await api<Task>(`/api/tasks/${task.id}`, { method: "PATCH", body })); }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
+  }
+  async function attach(picked: File[]) {
+    setUploading(true); setError("");
+    const errors: string[] = [];
+    let latest: Task | null = null;
+    let found = null as Insights | null;
+    for (const f of picked) {
+      try {
+        const r = await uploadFile(f, { taskId: task.id, today });
+        if (r.task) latest = r.task;
+        if (r.insights && (r.insights.deadline || r.insights.checklist.length)) found = { ...r.insights, deadline: r.insights.deadline ?? found?.deadline ?? null };
+      } catch (e) { errors.push((e as Error).message); }
+    }
+    if (latest) onChange(latest);
+    if (found) setInsights(found);
+    if (errors.length) setError(errors.join(" "));
+    setUploading(false);
+  }
+  async function removeFile(f: FileMeta) {
+    if (!confirm(`Remove “${f.name}” from this task?`)) return;
+    try { const r = await api<{ task: Task }>(`/api/files/${f.id}?taskId=${task.id}`, { method: "DELETE" }); onChange(r.task); }
+    catch (e) { setError((e as Error).message); }
   }
   const saveSteps = (next: Step[]) => { setSteps(next); patch({ steps: next }); };
   const doneCount = steps.filter((s) => s.done).length;
@@ -66,6 +93,36 @@ export default function TaskDetail({ task, projects, today, onChange }: Props) {
 
       <textarea className="textarea" style={{ marginTop: 12, minHeight: 60, background: "transparent" }} placeholder="Notes…" value={notes}
         onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== task.notes && patch({ notes })} />
+
+      {/* Files: attached to this task; THEO reads what it can */}
+      <div style={{ marginTop: 14 }}>
+        <div className="row between" style={{ marginBottom: 6 }}>
+          <b className="small">Files</b>
+          <span className="muted small">{task.files.length ? `${task.files.length} attached` : "none yet"}</span>
+        </div>
+        <FileList files={task.files} onRemove={removeFile} />
+        <div style={{ marginTop: task.files.length ? 10 : 0 }}>
+          <FileDrop compact onPick={attach} busy={uploading} disabled={task.files.length >= 10} label="Attach files" />
+        </div>
+        {insights && (
+          <div className="hint-banner" style={{ marginTop: 10 }}>
+            <b>THEO found something in your file:</b>
+            {insights.deadline && (
+              <div className="row between wrap" style={{ marginTop: 8 }}>
+                <span>Deadline <b>{insights.deadline.date}</b> (“{insights.deadline.cue}”, in {insights.deadline.file})</span>
+                <button className="btn small primary" onClick={async () => { await patch({ due_date: insights.deadline!.date }); setInsights((i) => i && { ...i, deadline: null }); }}>Use as due date</button>
+              </div>
+            )}
+            {insights.checklist.length > 0 && (
+              <div className="row between wrap" style={{ marginTop: 8 }}>
+                <span>A {insights.checklist.length}-item checklist in {insights.checklistFile}</span>
+                <button className="btn small primary" onClick={async () => { await patch({ steps: [...steps, ...insights.checklist.map((text) => ({ text, done: false }))] }); setInsights((i) => i && { ...i, checklist: [] }); }}>Add as steps</button>
+              </div>
+            )}
+            <div className="row" style={{ justifyContent: "flex-end" }}><button className="btn ghost small" onClick={() => setInsights(null)}>Dismiss</button></div>
+          </div>
+        )}
+      </div>
 
       <div className="meta">
         <div className="row"><CalendarIcon size={18} />

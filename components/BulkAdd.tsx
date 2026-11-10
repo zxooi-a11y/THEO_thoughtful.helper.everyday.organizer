@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { Project } from "@/lib/types";
+import type { FileMeta, Project } from "@/lib/types";
 import type { TaskDraft } from "@/lib/brain";
-import { api } from "./client";
+import { api, } from "./client";
+import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
 import { SparkIcon, XIcon } from "./Icons";
 
@@ -18,6 +19,7 @@ const ASPECTS: { key: Aspect; label: string }[] = [
 /** A draft plus what THEO originally suggested and your 👍/👎 on it. */
 type Row = TaskDraft & {
   notes?: string;
+  fileIds: number[];
   vote: "up" | "down" | null;
   aspects: Aspect[];
   suggested: { projectId: number | null; dueDate: string; steps: string[] };
@@ -50,6 +52,10 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
   // Single-entry fields ("" = let THEO decide).
   const [single, setSingle] = useState({ title: "", projectId: null as number | null, dueDate: defaultDate ?? "", notes: "" });
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [files, setFiles] = useState<FileMeta[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const [hints, setHints] = useState<{ deadline: { date: string; file: string; cue: string } | null; urgent: boolean; checklist: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -63,7 +69,24 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
   const switchMode = (m: Mode) => { setMode(m); setError(""); store.set("theo:addMode", m); };
   const addProject = (p: Project) => setProjects((ps) => (ps.some((x) => x.id === p.id) ? ps : [...ps, p].sort((a, b) => a.name.localeCompare(b.name))));
 
-  const canAnalyze = mode === "single" ? !!single.title.trim() : !!text.trim();
+  const canAnalyze = (mode === "single" ? !!single.title.trim() : !!text.trim()) && !uploading;
+
+  // Upload picked files one by one (each request stays under the host's size limit).
+  async function addFiles(picked: File[]) {
+    setUploading(true); setFileError("");
+    const errors: string[] = [];
+    for (const f of picked) {
+      if (files.length + 1 > 10) { errors.push("You can attach up to 10 files."); break; }
+      try { const r = await uploadFile(f); setFiles((cur) => [...cur, r.file]); }
+      catch (e) { errors.push((e as Error).message); }
+    }
+    if (errors.length) setFileError(errors.join(" "));
+    setUploading(false);
+  }
+  const removeFile = (f: FileMeta) => {
+    setFiles((cur) => cur.filter((x) => x.id !== f.id));
+    api(`/api/files/${f.id}`, { method: "DELETE" }).catch(() => {}); // staged upload: safe to discard
+  };
 
   async function analyze() {
     const input = mode === "single" ? single.title.trim() : text;
@@ -71,7 +94,10 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
     setBusy(true); setError("");
     store.set("theo:brief", brief);
     try {
-      const r = await api<{ drafts: TaskDraft[] }>("/api/analyze", { body: { text: input, today, brief } });
+      const r = await api<{ drafts: TaskDraft[]; fileHints: typeof hints }>("/api/analyze", {
+        body: { text: input, today, brief, fileIds: files.map((f) => f.id), useChecklist: mode === "single" },
+      });
+      setHints(r.fileHints);
       let drafts: (TaskDraft & { notes?: string })[] = r.drafts;
       if (mode === "single") {
         drafts = drafts.slice(0, 1).map((d) => ({
@@ -84,7 +110,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
         // Clicked a specific day? Use it unless the line itself named a date.
         drafts = drafts.map((d) => (d.dueReason.startsWith("You said") || d.dueReason === "Exact date given" ? d : { ...d, dueDate: defaultDate, dueReason: "Day you picked on the calendar" }));
       }
-      setRows(drafts.map((d) => ({ ...d, vote: null, aspects: [], suggested: { projectId: d.projectId, dueDate: d.dueDate, steps: d.steps } })));
+      setRows(drafts.map((d) => ({ ...d, fileIds: files.map((f) => f.id), vote: null, aspects: [], suggested: { projectId: d.projectId, dueDate: d.dueDate, steps: d.steps } })));
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
@@ -178,6 +204,16 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
               )}
             </div>
 
+            {/* Files: THEO reads them to make better Auto choices */}
+            <div className="attach">
+              <div className="attach-head">
+                <b>Files</b><span className="muted small">optional · THEO reads text, PDF and Word files to help Auto (a deadline, what it&apos;s about, a checklist)</span>
+              </div>
+              <FileDrop onPick={addFiles} busy={uploading} disabled={files.length >= 10} />
+              <FileList files={files} onRemove={removeFile} />
+              {fileError && <div className="err" style={{ marginTop: 8 }}>{fileError}</div>}
+            </div>
+
             {error && <div className="err" style={{ marginTop: 12 }}>{error}</div>}
             <div className="row between" style={{ marginTop: 16 }}>
               {mode === "batch" ? <button className="btn ghost" onClick={() => setText(EXAMPLE)}>Try an example</button> : <span />}
@@ -195,6 +231,12 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
               </p>
               {rows.length > 1 && <button className="btn ghost small" onClick={allUp}>👍 All good</button>}
             </div>
+            {hints && (hints.deadline || hints.urgent || hints.checklist > 0) && (
+              <div className="hint-banner" style={{ marginBottom: 12 }}>
+                <b>From your files:</b>{" "}
+                {[hints.deadline && `deadline ${hints.deadline.date} in ${hints.deadline.file}`, hints.urgent && "looks urgent", hints.checklist > 0 && `${hints.checklist}-item checklist${rows.length === 1 ? " used as steps" : " found (use Single task to turn it into steps)"}`].filter(Boolean).join(" · ")}
+              </div>
+            )}
             <div className="stack">
               {rows.map((d, i) => (
                 <div key={i} className={`draft ${d.vote ? "voted-" + d.vote : ""}`}>
@@ -206,10 +248,22 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                       {d.estimate && <span className="muted small">≈ {d.estimate}</span>}
                     </div>
                     <details open={d.vote === "down" && d.aspects.includes("steps")}>
-                      <summary>{d.steps.length} suggested steps{d.stepsSource === "learned" ? " (from your past edits)" : ""}</summary>
+                      <summary>{d.steps.length} suggested steps{d.stepsSource === "learned" ? " (from your past edits)" : d.stepsSource === "file" ? " (from your file)" : ""}</summary>
                       <textarea className="textarea" style={{ marginTop: 6, minHeight: 90 }} value={d.steps.join("\n")}
                         onChange={(e) => upd(i, { steps: e.target.value.split("\n") })} />
                     </details>
+                    {d.fileIds.length > 0 && (
+                      <div className="row-files">
+                        {d.fileIds.map((id) => {
+                          const f = files.find((x) => x.id === id);
+                          return f ? (
+                            <span key={id} className="tag" title={f.name}>📎 {f.name.length > 22 ? f.name.slice(0, 20) + "…" : f.name}
+                              <button type="button" aria-label={`Don't attach ${f.name} to this task`} onClick={() => upd(i, { fileIds: d.fileIds.filter((x) => x !== id) })}>×</button>
+                            </span>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
                     <div className="row wrap" style={{ gap: 6, marginTop: 8 }}>
                       <button className={`vote ${d.vote === "up" ? "on" : ""}`} onClick={() => vote(i, "up")} aria-pressed={d.vote === "up"} title="Good suggestion">👍</button>
                       <button className={`vote ${d.vote === "down" ? "on down" : ""}`} onClick={() => vote(i, "down")} aria-pressed={d.vote === "down"} title="Not quite right">👎</button>
