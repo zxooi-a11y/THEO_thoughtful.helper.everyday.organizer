@@ -55,13 +55,30 @@ export function unlinkFile(taskId: number, fileId: number) {
   return q(`DELETE FROM task_files WHERE task_id = $1 AND file_id = $2`, [taskId, fileId]);
 }
 
+// ── Events share the same files ──
+export async function linkEventFiles(eventId: number, fileIds: number[]) {
+  if (!fileIds.length) return;
+  await q(`INSERT INTO event_files (event_id, file_id) SELECT $1, f.id FROM files f WHERE f.id = ANY($2::int[]) ON CONFLICT DO NOTHING`, [eventId, fileIds]);
+}
+
+export async function countEventFiles(eventId: number): Promise<number> {
+  const [r] = await q<{ n: number }>(`SELECT count(*)::int AS n FROM event_files WHERE event_id = $1`, [eventId]);
+  return r.n;
+}
+
+export function unlinkEventFile(eventId: number, fileId: number) {
+  return q(`DELETE FROM event_files WHERE event_id = $1 AND file_id = $2`, [eventId, fileId]);
+}
+
+const UNUSED = `NOT EXISTS (SELECT 1 FROM task_files tf WHERE tf.file_id = files.id)
+           AND NOT EXISTS (SELECT 1 FROM event_files ef WHERE ef.file_id = files.id)`;
+
 /** Remove files nothing points to. `graceHours` protects files that were just uploaded and are still being staged. */
 export function deleteOrphans(graceHours = 0) {
-  return q(`DELETE FROM files WHERE NOT EXISTS (SELECT 1 FROM task_files tf WHERE tf.file_id = files.id)
-            AND created_at < now() - ($1::int * interval '1 hour')`, [graceHours]);
+  return q(`DELETE FROM files WHERE ${UNUSED} AND created_at < now() - ($1::int * interval '1 hour')`, [graceHours]);
 }
 
 /** Delete a staged file only if it isn't attached to anything. */
 export function deleteIfOrphan(id: number) {
-  return q(`DELETE FROM files WHERE id = $1 AND NOT EXISTS (SELECT 1 FROM task_files WHERE file_id = $1)`, [id]);
+  return q(`DELETE FROM files WHERE id = $1 AND ${UNUSED}`, [id]);
 }

@@ -131,3 +131,24 @@ test("attached files steer project, deadline, priority and steps", async () => {
   assert.equal(withList.stepsSource, "file");
   assert.equal(withList.steps[0], "Write the announcement post");
 });
+
+test("event files suggest type, date, time and link", async () => {
+  const { buildEventHints } = await import("../lib/brain/files.ts");
+  const invite = buildEventHints([{
+    name: "sarah-tom-wedding-invitation.pdf",
+    text: "Sarah & Tom are getting married!\nJoin us on Saturday 12 December 2026 at 4:30 PM\nPlease RSVP by 1 December 2026\nDetails: https://example.com/sarah-tom.",
+  }], TODAY)!;
+  assert.equal(invite.kind, "wedding");
+  assert.equal(invite.date?.value, "2026-12-12");   // the event, not the RSVP deadline
+  assert.equal(invite.time, "16:30");
+  assert.equal(invite.url, "https://example.com/sarah-tom");
+
+  // Type from the text when the file name says nothing; past dates ignored
+  const flight = buildEventHints([{ name: "booking.txt", text: "Your flight to Melbourne departs 20 Nov 2026 at 07:15. Booked on 2 Oct 2026." }], TODAY)!;
+  assert.equal(flight.kind, "trip");
+  assert.equal(flight.date?.value, "2026-11-20");
+  assert.equal(flight.time, "07:15");
+
+  // Nothing useful → null
+  assert.equal(buildEventHints([{ name: "scan.png", text: "" }], TODAY), null);
+});

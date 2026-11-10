@@ -4,6 +4,7 @@
 
 import { keywordCounts } from "./text.ts";
 import { safeDate, toISO, toDate, upcoming } from "./dates.ts";
+import { detectKind } from "../events.ts";
 
 export type FileDoc = { name: string; text: string };
 
@@ -97,6 +98,58 @@ export function buildFileContext(docs: FileDoc[], today: string): FileContext | 
     if (URGENT.test(d.text.slice(0, 3000))) urgent = true;
   }
   return { names: docs.map((d) => d.name), keywords, deadline, urgent, checklist, checklistFile };
+}
+
+// ── Events: read an invite / ticket / booking and suggest the event's details ──
+
+export type EventHints = {
+  /** Event type key (see lib/events.ts), e.g. "wedding". */
+  kind: string | null;
+  date: { value: string; file: string } | null;
+  /** 24h "HH:MM" */
+  time: string | null;
+  url: string | null;
+};
+
+// Words that mark a date as a deadline for something else (RSVP, payment…) rather than the event itself.
+const NOT_EVENT_DATE = /\b(rsvp|reply|respond|confirm|deadline|due|payable|pay by|book by|register by|by|before|until|expires?)\b[^.\n]{0,25}$/i;
+
+function findTime(text: string, around: number): string | null {
+  const win = text.slice(Math.max(0, around - 40), around + 120);
+  const m = /\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)\b/i.exec(win) ?? /\b([01]?\d|2[0-3]):([0-5]\d)()\b/.exec(win);
+  if (!m) return null;
+  let h = +m[1];
+  const min = m[2] ? +m[2] : 0;
+  const ap = (m[3] ?? "").toLowerCase();
+  if (ap === "pm" && h < 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+export function buildEventHints(docs: FileDoc[], today: string): EventHints | null {
+  if (!docs.length) return null;
+  let kind: string | null = null;
+  let date: EventHints["date"] = null, time: string | null = null, url: string | null = null;
+  let dateIsEventish = false;
+
+  for (const d of docs) {
+    const k = detectKind(d.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_\-.]+/g, " "), d.text.slice(0, 1500));
+    if (!kind && k !== "other") kind = k;
+
+    const text = d.text.slice(0, 60_000);
+    for (const h of explicitDates(text, today)) {
+      if (h.date < today) continue;
+      const eventish = !NOT_EVENT_DATE.test(text.slice(Math.max(0, h.index - 50), h.index));
+      // Prefer dates that aren't deadlines (RSVP etc.); among equals, the earliest.
+      const better = !date || (eventish && !dateIsEventish) || (eventish === dateIsEventish && h.date < date.value);
+      if (better) { date = { value: h.date, file: d.name }; dateIsEventish = eventish; time = findTime(text, h.index); }
+    }
+    if (!url) {
+      const u = /https?:\/\/[^\s)<>"'\]]+/i.exec(text);
+      if (u) url = u[0].replace(/[.,;:!?]+$/, "");
+    }
+  }
+  return kind || date || url ? { kind, date, time, url } : null;
 }
 
 export const _test = { explicitDates, toISO };

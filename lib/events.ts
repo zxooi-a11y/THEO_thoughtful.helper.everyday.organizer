@@ -1,5 +1,6 @@
 // Event types: label, colours for the card (soft panel + strong accent) and words that identify them.
 // Pure module, shared by the server and the browser.
+import type { FileMeta } from "./types.ts";
 
 export type EventKind = {
   key: string;
@@ -46,4 +47,5 @@ export type LifeEvent = {
   notes: string;
   favorite: boolean;
   created_at: string;
+  files: FileMeta[];
 };

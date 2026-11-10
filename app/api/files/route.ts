@@ -1,7 +1,8 @@
 import { extractText } from "@/lib/extract";
-import { buildFileContext } from "@/lib/brain";
-import { countTaskFiles, deleteOrphans, linkFiles, MAX_FILE_BYTES, MAX_FILES_PER_TASK, MAX_TOTAL_BYTES, saveFile, storageUsed } from "@/lib/filesRepo";
+import { buildEventHints, buildFileContext } from "@/lib/brain";
+import { countEventFiles, countTaskFiles, deleteOrphans, linkEventFiles, linkFiles, MAX_FILE_BYTES, MAX_FILES_PER_TASK, MAX_TOTAL_BYTES, saveFile, storageUsed } from "@/lib/filesRepo";
 import { getTask, learnKeywords } from "@/lib/repo";
+import { getEvent } from "@/lib/eventsRepo";
 import { bad, handle, ok, todayFrom } from "@/lib/http";
 
 export const maxDuration = 30;
@@ -25,7 +26,13 @@ export const POST = handle(async (req: Request) => {
   if ((await storageUsed()) + file.size > MAX_TOTAL_BYTES) return bad("File storage is nearly full (free database limit). Delete some old files first.", 507);
 
   const taskId = Number(form.get("taskId")) || null;
+  const eventId = Number(form.get("eventId")) || null;
+  const forEvent = eventId != null || form.get("for") === "event"; // staged uploads for the Add event window
   const today = todayFrom(form.get("today"));
+  if (eventId) {
+    if (!(await getEvent(eventId))) return bad("Event not found", 404);
+    if ((await countEventFiles(eventId)) >= MAX_FILES_PER_TASK) return bad(`An event can have up to ${MAX_FILES_PER_TASK} files.`);
+  }
   if (taskId) {
     if (!(await getTask(taskId))) return bad("Task not found", 404);
     if ((await countTaskFiles(taskId)) >= MAX_FILES_PER_TASK) return bad(`A task can have up to ${MAX_FILES_PER_TASK} files.`);
@@ -36,6 +43,14 @@ export const POST = handle(async (req: Request) => {
   const text = await extractText(name, file.type, buf);
   const meta = await saveFile({ name, mime: file.type || "application/octet-stream", buf, text });
   deleteOrphans(24).catch(() => {}); // tidy up abandoned uploads (best effort)
+
+  // Events: attach (edit) or stage (new), and tell the form what THEO read in the file.
+  if (forEvent) {
+    const hints = text ? buildEventHints([{ name, text }], today) : null;
+    if (!eventId) return ok({ file: meta, hints }, 201);
+    await linkEventFiles(eventId, [meta.id]);
+    return ok({ file: meta, event: await getEvent(eventId), hints }, 201);
+  }
 
   if (!taskId) return ok({ file: meta }, 201);
 

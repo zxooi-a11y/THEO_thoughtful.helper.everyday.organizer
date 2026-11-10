@@ -1,4 +1,5 @@
-import { deleteIfOrphan, deleteOrphans, getFileData, unlinkFile } from "@/lib/filesRepo";
+import { deleteIfOrphan, deleteOrphans, getFileData, unlinkEventFile, unlinkFile } from "@/lib/filesRepo";
+import { getEvent } from "@/lib/eventsRepo";
 import { bad, handle, ok } from "@/lib/http";
 import { getTask } from "@/lib/repo";
 
@@ -26,14 +27,18 @@ export const GET = handle(async (_req: Request, { params }: Ctx) => {
   });
 });
 
-/** `?taskId=` detaches the file from that task (and deletes it if nothing else uses it); without it, removes a staged upload. */
+/** `?taskId=` / `?eventId=` detaches the file from that task or event (and deletes it if nothing else uses it); without it, removes a staged upload. */
 export const DELETE = handle(async (req: Request, { params }: Ctx) => {
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id < 1) return bad("File not found", 404);
-  const taskId = Number(new URL(req.url).searchParams.get("taskId")) || null;
+  const params2 = new URL(req.url).searchParams;
+  const taskId = Number(params2.get("taskId")) || null;
+  const eventId = Number(params2.get("eventId")) || null;
   if (taskId) await unlinkFile(taskId, id);
+  if (eventId) await unlinkEventFile(eventId, id);
   await deleteIfOrphan(id);
   if (taskId) return ok({ task: await getTask(taskId) });
+  if (eventId) return ok({ event: await getEvent(eventId) });
   await deleteOrphans(24);
   return ok({ ok: true });
 });

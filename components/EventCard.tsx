@@ -68,6 +68,7 @@ export default function EventCard({ event: e, today, onFavorite, onOpen }: Props
         </div>
         <div className="ev-foot">
           <span className="ev-loc">{e.location && <><Pin /> <span>{e.location}</span></>}</span>
+          {e.files?.length > 0 && <span className="ev-files" title={e.files.map((f) => f.name).join(", ")}>📎 {e.files.length}</span>}
           {e.url && (
             <a className="ev-link" href={e.url} target="_blank" rel="noopener noreferrer" onClick={(x) => x.stopPropagation()} aria-label="Open event link" title={e.url}>
               <External />

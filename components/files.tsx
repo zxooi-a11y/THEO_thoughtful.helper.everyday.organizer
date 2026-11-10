@@ -2,6 +2,8 @@
 // Shared file UI: upload helper, drop zone and file chips (used by Add tasks and the task panel).
 import { useRef, useState } from "react";
 import type { FileMeta, Task } from "@/lib/types";
+import type { LifeEvent } from "@/lib/events";
+import type { EventHints } from "@/lib/brain";
 import { XIcon } from "./Icons";
 
 export const MAX_FILE_MB = 4;
@@ -29,12 +31,17 @@ export function fileEmoji(f: Pick<FileMeta, "mime" | "name">): string {
 }
 
 /** Upload one file. With `taskId` it's attached to that task; without, it's staged for the Add tasks window. */
-export async function uploadFile(file: File, opts: { taskId?: number; today?: string } = {}): Promise<{ file: FileMeta; task?: Task; insights?: Insights }> {
+export async function uploadFile(
+  file: File,
+  opts: { taskId?: number; eventId?: number; forEvent?: boolean; today?: string } = {},
+): Promise<{ file: FileMeta; task?: Task; insights?: Insights; event?: LifeEvent; hints?: EventHints | null }> {
   if (file.size > MAX_FILE_MB * 1024 * 1024) throw new Error(`“${file.name}” is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is ${MAX_FILE_MB} MB per file.`);
   if (file.size === 0) throw new Error(`“${file.name}” is empty.`);
   const fd = new FormData();
   fd.append("file", file);
   if (opts.taskId) fd.append("taskId", String(opts.taskId));
+  if (opts.eventId) fd.append("eventId", String(opts.eventId));
+  if (opts.forEvent) fd.append("for", "event"); // staged upload for the Add event window
   if (opts.today) fd.append("today", opts.today);
   let res: Response;
   try { res = await fetch("/api/files", { method: "POST", body: fd }); }

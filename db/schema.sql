@@ -120,6 +120,14 @@ CREATE TABLE IF NOT EXISTS task_files (
 );
 CREATE INDEX IF NOT EXISTS task_files_file_idx ON task_files (file_id);
 
+-- Files attached to events (same files table as tasks).
+CREATE TABLE IF NOT EXISTS event_files (
+  event_id  INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  file_id   INT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  PRIMARY KEY (event_id, file_id)
+);
+CREATE INDEX IF NOT EXISTS event_files_file_idx ON event_files (file_id);
+
 -- Seed a few starter projects (ignored if they already exist).
 INSERT INTO projects (name, color) VALUES
   ('Home', 'orange'), ('Health', 'green'), ('Finance', 'yellow'),

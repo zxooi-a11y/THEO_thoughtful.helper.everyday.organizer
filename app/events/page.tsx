@@ -1,13 +1,16 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { detectKind, EVENT_KINDS, type LifeEvent } from "@/lib/events";
+import { detectKind, EVENT_KINDS, kindOf, type LifeEvent } from "@/lib/events";
+import type { EventHints } from "@/lib/brain";
+import type { FileMeta } from "@/lib/types";
 import EventCard from "@/components/EventCard";
-import { api, localToday } from "@/components/client";
+import { api, fmtDate, localToday } from "@/components/client";
+import { FileDrop, FileList, uploadFile } from "@/components/files";
 import { PlusIcon, XIcon } from "@/components/Icons";
 
-type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; location: string; url: string; notes: string; favorite: boolean };
+type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; location: string; url: string; notes: string; favorite: boolean; files: FileMeta[] };
 
-const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", location: "", url: "", notes: "", favorite: false });
+const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", location: "", url: "", notes: "", favorite: false, files: [] });
 
 export default function EventsPage() {
   const [today, setToday] = useState("");
@@ -16,6 +19,9 @@ export default function EventsPage() {
   const [showPast, setShowPast] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const [hints, setHints] = useState<EventHints | null>(null);
   const [error, setError] = useState("");
 
   const load = useCallback(() => api<LifeEvent[]>("/api/events").then(setEvents).catch((e) => setError(e.message)), []);
@@ -32,9 +38,62 @@ export default function EventsPage() {
     if (ev) { openEdit(ev); window.history.replaceState(null, "", "/events"); }
   }, [events]);
 
+  useEffect(() => { if (!draft) { setHints(null); setFileError(""); } }, [draft]);
+  const closeDraft = () => { setDraft(null); load(); };
+
+  // Keep the most useful suggestion from each file: first type & link, earliest date (with its time).
+  const mergeHints = (a: EventHints | null, b: EventHints | null | undefined): EventHints | null => {
+    if (!b) return a;
+    if (!a) return b;
+    const useB = !!b.date && (!a.date || b.date.value < a.date.value);
+    return { kind: a.kind ?? b.kind, url: a.url ?? b.url, date: useB ? b.date : a.date, time: useB ? b.time : a.time };
+  };
+
+  async function addFiles(picked: File[]) {
+    if (!draft) return;
+    setUploading(true); setFileError("");
+    const errors: string[] = [];
+    let found = hints;
+    for (const f of picked) {
+      try {
+        const r = await uploadFile(f, draft.id ? { eventId: draft.id, today } : { forEvent: true, today });
+        found = mergeHints(found, r.hints);
+        setDraft((d) => d && { ...d, files: r.event ? r.event.files : [...d.files, r.file] });
+      } catch (e) { errors.push((e as Error).message); }
+    }
+    setHints(found);
+    if (errors.length) setFileError(errors.join(" "));
+    setUploading(false);
+  }
+
+  async function removeFile(f: FileMeta) {
+    if (!draft) return;
+    try {
+      if (draft.id) {
+        const r = await api<{ event: LifeEvent }>(`/api/files/${f.id}?eventId=${draft.id}`, { method: "DELETE" });
+        setDraft((d) => d && { ...d, files: r.event?.files ?? d.files.filter((x) => x.id !== f.id) });
+      } else {
+        await api(`/api/files/${f.id}`, { method: "DELETE" });
+        setDraft((d) => d && { ...d, files: d.files.filter((x) => x.id !== f.id) });
+      }
+    } catch (e) { setFileError((e as Error).message); }
+  }
+
+  // One tap fills in what THEO read: type, date, time and link (link only if still empty).
+  function applyHints() {
+    if (!hints) return;
+    upd({
+      ...(hints.kind ? { kind: hints.kind, autoKind: false } : {}),
+      ...(hints.date ? { start_date: hints.date.value } : {}),
+      ...(hints.time ? { start_time: hints.time } : {}),
+      ...(hints.url && !draft?.url ? { url: hints.url } : {}),
+    });
+    setHints(null);
+  }
+
   function openEdit(e: LifeEvent) {
     setError("");
-    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, location: e.location, url: e.url, notes: e.notes, favorite: e.favorite });
+    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, location: e.location, url: e.url, notes: e.notes, favorite: e.favorite, files: e.files ?? [] });
   }
 
   async function save() {
@@ -43,7 +102,7 @@ export default function EventsPage() {
     const body = { ...draft, end_date: draft.end_date || null };
     try {
       if (draft.id) await api(`/api/events/${draft.id}`, { method: "PATCH", body });
-      else await api("/api/events", { body });
+      else await api("/api/events", { body: { ...body, fileIds: draft.files.map((f) => f.id) } });
       setDraft(null); load();
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
@@ -112,11 +171,11 @@ export default function EventsPage() {
       )}
 
       {draft && (
-        <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && setDraft(null)}>
+        <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeDraft()}>
           <form className="modal stack" style={{ width: "min(640px, 100%)" }} onSubmit={(e) => { e.preventDefault(); save(); }}>
             <div className="row between">
               <h2 style={{ fontSize: 22 }}>{draft.id ? "Edit event" : "Add event"}</h2>
-              <button type="button" className="icon-btn" onClick={() => setDraft(null)} aria-label="Close"><XIcon /></button>
+              <button type="button" className="icon-btn" onClick={closeDraft} aria-label="Close"><XIcon /></button>
             </div>
 
             <label className="stack" style={{ gap: 6 }}>
@@ -163,6 +222,30 @@ export default function EventsPage() {
 
             <textarea className="textarea" style={{ minHeight: 70 }} placeholder="Notes: dress code, who's going, gift ideas…" value={draft.notes} onChange={(e) => upd({ notes: e.target.value })} />
 
+            {/* Files: THEO reads them and can fill in the event for you */}
+            <div className="attach" style={{ marginTop: 0 }}>
+              <div className="attach-head">
+                <b>Files</b><span className="muted small">tickets, invites, bookings · THEO reads text, PDF and Word files</span>
+              </div>
+              <FileDrop onPick={addFiles} busy={uploading} disabled={draft.files.length >= 10} />
+              <FileList files={draft.files} onRemove={removeFile} />
+              {fileError && <div className="err" style={{ marginTop: 8 }}>{fileError}</div>}
+              {hints && (
+                <div className="hint-banner" style={{ marginTop: 10 }}>
+                  <b>THEO found in your file:</b>
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {hints.kind && <li>Type: <b>{kindOf(hints.kind).label}</b></li>}
+                    {hints.date && <li>Date: <b>{fmtDate(hints.date.value, true)}</b>{hints.time ? <> at <b>{hints.time}</b></> : null} <span className="muted">({hints.date.file})</span></li>}
+                    {hints.url && <li style={{ wordBreak: "break-all" }}>Link: {hints.url}{draft.url ? <span className="muted"> (you already have one, so it won&apos;t be replaced)</span> : null}</li>}
+                  </ul>
+                  <div className="row" style={{ justifyContent: "flex-end" }}>
+                    <button type="button" className="btn ghost small" onClick={() => setHints(null)}>Dismiss</button>
+                    <button type="button" className="btn primary small" onClick={applyHints}>Fill these in</button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {error && <div className="err">{error}</div>}
 
             <div className="row between wrap">
@@ -173,7 +256,7 @@ export default function EventsPage() {
                 )}
               </div>
               <div className="row">
-                <button type="button" className="btn" onClick={() => setDraft(null)}>Cancel</button>
+                <button type="button" className="btn" onClick={closeDraft}>Cancel</button>
                 <button className="btn primary" disabled={busy || !draft.title.trim() || !draft.start_date}>{busy ? "Saving…" : draft.id ? "Save" : "Add event"}</button>
               </div>
             </div>

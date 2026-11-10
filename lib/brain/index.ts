@@ -11,8 +11,8 @@ export { planGoal } from "./goals.ts";
 export type { GoalPlan, PlannedTask } from "./goals.ts";
 export type { LearnedPlan, PlanStep } from "./steps.ts";
 export type { LearnedKeywords, ProjectRef } from "./classify.ts";
-export { buildFileContext } from "./files.ts";
-export type { FileContext, FileDoc } from "./files.ts";
+export { buildFileContext, buildEventHints } from "./files.ts";
+export type { FileContext, FileDoc, EventHints } from "./files.ts";
 
 export type BrainContext = {
   projects: ProjectRef[];

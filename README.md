@@ -56,6 +56,7 @@ db/schema.sql     database schema (idempotent)
 ```
 
 ## Files
+- **Events too:** attach tickets, invites and bookings to an event. THEO reads the file and offers to fill in the event's type, date (it prefers the event date over an RSVP deadline), time and link with one tap, and event cards show a 📎 count.
 - Stored in your Neon database (no extra service or cost). Limit: **4 MB per file** (Vercel's free request size) and 10 files per task. Uploads stop at 350 MB total to stay inside Neon's free 0.5 GB.
 - Reading happens inside your own app; file contents are never sent to any outside service (including the optional Gemini key).
 - With `APP_PASSCODE` set, downloads need the passcode too.
