@@ -4,6 +4,7 @@ import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { api } from "./client";
 import ProjectSelect from "./ProjectSelect";
 import { FileDrop, FileList, uploadFile } from "./files";
+import { normalizeWebUrl } from "@/lib/links";
 import { PlusIcon, XIcon } from "./Icons";
 
 type Props = {
@@ -34,6 +35,8 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
   const [estimate, setEstimate] = useState(task.estimate);
   const [tags, setTags] = useState(task.tags.map((t) => `#${t}`).join(" "));
   const [notes, setNotes] = useState(task.notes);
+  const [finalUrl, setFinalUrl] = useState(task.final_url ?? "");
+  const [finalNote, setFinalNote] = useState(task.final_note ?? "");
   const [steps, setSteps] = useState<Step[]>(task.steps.map((s) => ({ ...s })));
   const [files, setFiles] = useState<FileMeta[]>(task.files ?? []);
   const [busy, setBusy] = useState(false);
@@ -47,13 +50,14 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
   async function save(e?: React.FormEvent) {
     e?.preventDefault();
     if (!title.trim()) { setError("The task needs a name."); return; }
+    if (normalizeWebUrl(finalUrl) === null) { setError("The final work link doesn't look like a web link. Use something like https://example.com/my-work"); return; }
     setBusy(true); setError("");
     try {
       const updated = await api<Task>(`/api/tasks/${task.id}`, {
         method: "PATCH",
         body: {
           title: title.trim(), project_id: projectId, due_date: due || null, priority, status,
-          estimate: estimate.trim(), tags: parseTags(tags), notes,
+          estimate: estimate.trim(), tags: parseTags(tags), notes, final_url: finalUrl, final_note: finalNote,
           steps: steps.filter((s) => s.text.trim()).map((s) => ({ text: s.text.trim(), done: s.done })),
         },
       });
@@ -157,6 +161,13 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
           <button type="button" className="btn ghost small" style={{ alignSelf: "flex-start" }} onClick={() => setSteps([...steps, { text: "", done: false }])}>
             <span className="row" style={{ gap: 4 }}><PlusIcon size={14} /> Add step</span>
           </button>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="small" style={{ fontWeight: 700 }}>Final work <span className="muted">· link to the finished result</span></span>
+          <input className="input" inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="https://… (design, document, website, repo)"
+            value={finalUrl} onChange={(e) => setFinalUrl(e.target.value)} />
+          <input className="input" placeholder="What is it? e.g. Final logo pack v3 (optional)" value={finalNote} onChange={(e) => setFinalNote(e.target.value)} />
         </div>
 
         <textarea className="textarea" style={{ minHeight: 80 }} placeholder="Notes…" value={notes} onChange={(e) => setNotes(e.target.value)} />

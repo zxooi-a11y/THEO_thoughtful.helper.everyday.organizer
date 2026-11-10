@@ -5,6 +5,7 @@ import type { Project, Task } from "@/lib/types";
 import { api, fmtDate, localToday } from "@/components/client";
 import { SearchIcon } from "@/components/Icons";
 import TaskEditor from "@/components/TaskEditor";
+import FinalWorkLink from "@/components/FinalWork";
 
 export default function ArchivePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -33,15 +34,18 @@ export default function ArchivePage() {
         {tasks.map((t) => {
           const p = projects.find((x) => x.id === t.project_id); const c = colorOf(p?.color);
           return (
-            <div key={t.id} className="list-row wrap">
+            <div key={t.id} className="list-row arch-row">
               <span className="chip" style={{ background: c.bg, color: c.fg, fontSize: 11 }}>{p?.name ?? "Inbox"}</span>
               <div className="grow">
                 <div style={{ fontWeight: 600 }}>{t.title}</div>
                 <div className="muted small">{t.completed_at ? `Done ${fmtDate(t.completed_at.slice(0, 10), true)}` : "Archived"} · was due {fmtDate(t.due_date)}</div>
+                {t.final_url && <div style={{ marginTop: 6 }}><FinalWorkLink url={t.final_url} note={t.final_note} compact /></div>}
               </div>
-              <button className="btn ghost small" onClick={() => setEditingTask(t)}>Edit</button>
-              <button className="btn ghost small" onClick={() => act(t, { status: "todo", archived: false })}>Reopen</button>
-              <button className="btn danger small" onClick={() => act(t, null)}>Delete</button>
+              <div className="arch-actions">
+                <button className="btn ghost small" onClick={() => setEditingTask(t)}>Edit</button>
+                <button className="btn ghost small" onClick={() => act(t, { status: "todo", archived: false })}>Reopen</button>
+                <button className="btn danger small" onClick={() => act(t, null)}>Delete</button>
+              </div>
             </div>
           );
         })}

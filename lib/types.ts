@@ -24,6 +24,9 @@ export type Task = {
   completed_at: string | null;
   steps: Step[];
   files: FileMeta[];
+  /** Link to the finished work, and what it is. Empty until added. */
+  final_url: string;
+  final_note: string;
 };
 
 export type Goal = { id: number; title: string; project_id: number | null; created_at: string; total: number; done: number };

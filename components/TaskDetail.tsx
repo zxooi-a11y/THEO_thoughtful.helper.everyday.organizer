@@ -5,6 +5,8 @@ import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { addDays } from "@/lib/brain/dates";
 import { api, relDue, timeAgo } from "./client";
 import ProjectSelect from "./ProjectSelect";
+import FinalWorkLink from "./FinalWork";
+import { normalizeWebUrl } from "@/lib/links";
 import { FileDrop, FileList, uploadFile, type Insights } from "./files";
 import { CalendarIcon, ClockIcon, FolderIcon, PlusIcon, XIcon } from "./Icons";
 
@@ -19,9 +21,12 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [finalOpen, setFinalOpen] = useState(false);
+  const [fUrl, setFUrl] = useState(task.final_url ?? "");
+  const [fNote, setFNote] = useState(task.final_note ?? "");
   const [insights, setInsights] = useState<Insights | null>(null);
 
-  useEffect(() => { setSteps(task.steps); setNotes(task.notes); setTitle(task.title); setEstimate(task.estimate); setError(""); }, [task]);
+  useEffect(() => { setSteps(task.steps); setNotes(task.notes); setTitle(task.title); setEstimate(task.estimate); setError(""); setFinalOpen(false); setFUrl(task.final_url ?? ""); setFNote(task.final_note ?? ""); }, [task]);
   // Suggestions from an attached file belong to the task they were made for.
   useEffect(() => { setInsights(null); }, [task.id]);
 
@@ -55,6 +60,13 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
     if (!confirm(`Remove “${f.name}” from this task?`)) return;
     try { const r = await api<{ task: Task }>(`/api/files/${f.id}?taskId=${task.id}`, { method: "DELETE" }); onChange(r.task); }
     catch (e) { setError((e as Error).message); }
+  }
+  async function saveFinal(url: string, note: string) {
+    if (normalizeWebUrl(url) === null) { setError("That doesn't look like a web link. Use something like https://example.com/my-work"); return; }
+    setBusy(true); setError("");
+    try { onChange(await api<Task>(`/api/tasks/${task.id}`, { method: "PATCH", body: { final_url: url, final_note: note } })); setFinalOpen(false); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
   const saveSteps = (next: Step[]) => { setSteps(next); patch({ steps: next }); };
   const doneCount = steps.filter((s) => s.done).length;
@@ -96,6 +108,36 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
 
       <textarea className="textarea" style={{ marginTop: 12, minHeight: 60, background: "transparent" }} placeholder="Notes…" value={notes}
         onChange={(e) => setNotes(e.target.value)} onBlur={() => notes !== task.notes && patch({ notes })} />
+
+      {/* Final work: the link / submission that showcases the finished task */}
+      <div className="final-block">
+        <div className="row between">
+          <b className="small">Final work</b>
+          {task.final_url && !finalOpen && <button type="button" className="btn ghost small" style={{ padding: "2px 8px" }} onClick={() => setFinalOpen(true)}>Edit</button>}
+        </div>
+        {finalOpen ? (
+          <div className="final-form">
+            <input className="input" autoFocus inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="Paste the link: design, doc, website, repo…"
+              value={fUrl} onChange={(e) => setFUrl(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveFinal(fUrl, fNote)} />
+            <input className="input" placeholder="What is it? e.g. Final logo pack v3 (optional)" value={fNote} onChange={(e) => setFNote(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveFinal(fUrl, fNote)} />
+            <div className="row between wrap">
+              {task.final_url ? <button type="button" className="btn danger small" disabled={busy} onClick={() => saveFinal("", "")}>Remove</button> : <span />}
+              <div className="row">
+                <button type="button" className="btn small" disabled={busy} onClick={() => { setFinalOpen(false); setFUrl(task.final_url ?? ""); setFNote(task.final_note ?? ""); }}>Cancel</button>
+                <button type="button" className="btn primary small" disabled={busy || !fUrl.trim()} onClick={() => saveFinal(fUrl, fNote)}>Save</button>
+              </div>
+            </div>
+          </div>
+        ) : task.final_url ? (
+          <div style={{ marginTop: 8 }}><FinalWorkLink url={task.final_url} note={task.final_note} /></div>
+        ) : (
+          <div style={{ marginTop: 6 }}>
+            {task.status === "done" && <div className="hint-banner" style={{ marginBottom: 8 }}>🎉 Done! Add a link to the finished work to showcase it.</div>}
+            <button type="button" className="btn small" onClick={() => setFinalOpen(true)}>🔗 Add final link</button>
+          </div>
+        )}
+      </div>
 
       {/* Files: attached to this task; THEO reads what it can */}
       <div style={{ marginTop: 14 }}>

@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS tasks (
   started_at    TIMESTAMPTZ,
   completed_at  TIMESTAMPTZ
 );
+-- Link to the finished work (a design, doc, site, repo…) and a one-line description of it.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS final_url  TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS final_note TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS tasks_due_idx     ON tasks (due_date);
 CREATE INDEX IF NOT EXISTS tasks_project_idx ON tasks (project_id);
 CREATE INDEX IF NOT EXISTS tasks_goal_idx    ON tasks (goal_id);

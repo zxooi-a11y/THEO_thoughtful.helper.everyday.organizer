@@ -6,7 +6,7 @@ import { keywords } from "./brain/text";
 import type { Project, Step, Task } from "./types";
 
 const TASK_SELECT = `
-  SELECT t.id, t.title, t.notes, t.project_id, t.goal_id, t.tags,
+  SELECT t.id, t.title, t.notes, t.final_url, t.final_note, t.project_id, t.goal_id, t.tags,
          to_char(t.due_date, 'YYYY-MM-DD') AS due_date, t.due_reason, t.estimate, t.priority,
          t.status, t.archived, t.created_at, t.started_at, t.completed_at,
          COALESCE((SELECT json_agg(json_build_object('id', s.id, 'text', s.text, 'done', s.done) ORDER BY s.position)
@@ -190,7 +190,7 @@ export async function createTask(t: NewTask, opts: { learn?: boolean } = {}): Pr
 }
 
 export type TaskPatch = Partial<{
-  title: string; notes: string; project_id: number | null; tags: string[]; due_date: string | null;
+  title: string; notes: string; final_url: string; final_note: string; project_id: number | null; tags: string[]; due_date: string | null;
   estimate: string; priority: number; status: Task["status"]; archived: boolean; steps: Step[];
 }>;
 
@@ -200,7 +200,7 @@ export async function updateTask(id: number, patch: TaskPatch) {
   const cols: string[] = [];
   const p: unknown[] = [];
   const set = (col: string, v: unknown) => { p.push(v); cols.push(`${col} = $${p.length}`); };
-  for (const k of ["title", "notes", "project_id", "tags", "due_date", "estimate", "priority", "archived"] as const) {
+  for (const k of ["title", "notes", "final_url", "final_note", "project_id", "tags", "due_date", "estimate", "priority", "archived"] as const) {
     if (k in patch) set(k, patch[k]);
   }
   if (patch.status && patch.status !== before.status) {

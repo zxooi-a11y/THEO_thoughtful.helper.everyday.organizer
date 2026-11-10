@@ -152,3 +152,19 @@ test("event files suggest type, date, time and link", async () => {
   // Nothing useful → null
   assert.equal(buildEventHints([{ name: "scan.png", text: "" }], TODAY), null);
 });
+
+test("final-work links: only safe web links are accepted", async () => {
+  const { normalizeWebUrl, hostOf, isSafeLink } = await import("../lib/links.ts");
+  assert.equal(normalizeWebUrl("  https://figma.com/file/abc?x=1 "), "https://figma.com/file/abc?x=1");
+  assert.equal(normalizeWebUrl("figma.com/file/abc"), "https://figma.com/file/abc");
+  assert.equal(normalizeWebUrl("docs.google.com/document/d/1"), "https://docs.google.com/document/d/1");
+  assert.equal(normalizeWebUrl("http://example.org"), "http://example.org/");
+  assert.equal(normalizeWebUrl(""), "");
+  for (const bad of ["javascript:alert(1)", "JaVaScRiPt:alert(1)", "data:text/html,<b>x</b>", "ftp://example.com", "file:///etc/passwd",
+    "not a link", "//evil.com", "localhost", "https://nodot", "mailto:a@b.com"]) {
+    assert.equal(normalizeWebUrl(bad), null, bad);
+  }
+  assert.equal(hostOf("https://www.figma.com/file/abc"), "figma.com");
+  assert.equal(isSafeLink("https://example.com"), true);
+  assert.equal(isSafeLink("javascript:alert(1)"), false);
+});
