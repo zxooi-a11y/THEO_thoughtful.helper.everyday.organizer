@@ -25,27 +25,27 @@ export default function KpiCards({ stats }: { stats: Stats | null }) {
     <div className="kpis">
       <div className="card kpi">
         <div>
-          <div className="label">Your activity level</div>
+          <div className="label"><span className="full">Your activity level</span><span className="short">Activity</span></div>
           <div className="value">{activity}%</div>
           <div className="delta"><i style={{ background: "#F2A541" }} /> <span className="muted">{k?.overdue ? `${k.overdue} overdue` : "On track"}</span></div>
         </div>
-        <Sparkline values={cumulative} color="#F2A541" />
+        <span className="spark"><Sparkline values={cumulative} color="#F2A541" /></span>
       </div>
       <div className="card kpi">
         <div>
-          <div className="label">Number of completed tasks</div>
-          <div className="value">{k?.done_month ?? 0}<small>/month</small></div>
-          <div className="delta"><i style={{ background: "#7F84E8" }} /> <span className="muted">{monthDelta === null ? "First month" : `${monthDelta >= 0 ? "+" : ""}${monthDelta}% vs last`}</span></div>
+          <div className="label"><span className="full">Number of completed tasks</span><span className="short">Completed</span></div>
+          <div className="value">{k?.done_month ?? 0}<small><span className="full">/month</span><span className="short">/mo</span></small></div>
+          <div className="delta"><i style={{ background: "#7F84E8" }} /> <span className="muted">{monthDelta === null ? "First month" : `${monthDelta >= 0 ? "+" : ""}${monthDelta}%`}<span className="full">{monthDelta === null ? "" : " vs last"}</span></span></div>
         </div>
-        <Sparkline values={days.map((d) => d.done)} color="#7F84E8" />
+        <span className="spark"><Sparkline values={days.map((d) => d.done)} color="#7F84E8" /></span>
       </div>
       <div className="card kpi">
         <div>
-          <div className="label">Goal progress</div>
+          <div className="label"><span className="full">Goal progress</span><span className="short">Goals</span></div>
           <div className="value">{goalPct}%</div>
-          <div className="delta"><i style={{ background: "#5CC97B" }} /> <span className="muted">{k?.goal_done ?? 0} of {k?.goal_total ?? 0} goal steps</span></div>
+          <div className="delta"><i style={{ background: "#5CC97B" }} /> <span className="muted">{k?.goal_done ?? 0}/{k?.goal_total ?? 0}<span className="full"> goal steps</span></span></div>
         </div>
-        <Sparkline kind="bar" values={[goalPct / 100]} color="#5CC97B" />
+        <span className="spark"><Sparkline kind="bar" values={[goalPct / 100]} color="#5CC97B" /></span>
       </div>
     </div>
   );

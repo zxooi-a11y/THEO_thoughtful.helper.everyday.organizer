@@ -317,3 +317,40 @@ input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-dat
   .draft > .icon-btn { position: absolute; top: 6px; right: 6px; }
   .draft > :first-child { padding-right: 26px; }
 }
+
+/* ── Analytics section: collapsible, compact on phones ───────── */
+.stats-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: transparent; padding: 0; text-align: left; cursor: pointer; }
+.stats-toggle h2 { display: block; margin: 0; }
+.stats-sub { display: block; margin-top: 6px; }
+.stats-chev { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--soft); border-radius: 20px; padding: 6px 12px; white-space: nowrap; }
+.stats-chev i { width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-2px); transition: transform .15s; }
+.stats-chev i.open { transform: rotate(-135deg) translateY(-1px); }
+.kpi .short { display: none; }
+@media (max-width: 860px) {
+  .stats-sub { display: none; }
+  .stats-toggle h2 { font-size: 14px; }
+  .stats-chev { padding: 5px 10px; }
+  /* three cards side by side */
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 18px; }
+  .kpi { display: block; min-height: 0; padding: 12px 10px; border-radius: 12px; }
+  .kpi .full { display: none; }
+  .kpi .short { display: inline; }
+  .kpi .label { font-size: 11px; }
+  .kpi .value { font-size: 24px; margin-top: 6px; }
+  .kpi .value small { font-size: 10px; }
+  .kpi .delta { font-size: 10px; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+  .kpi .delta i { width: 8px; height: 8px; }
+  .kpi .spark { display: none; }
+
+  /* more room for the calendar */
+  .cal-layout { gap: 14px; }
+  .cal-head { margin-top: 4px; margin-bottom: 12px; }
+  .cal-head h2 { font-size: 20px !important; }
+  .cell { min-height: 104px; padding: 5px 4px; }
+  .cell .dhead { margin-bottom: 4px; font-size: 11px; }
+  .cell .chip { font-size: 10px; padding: 4px 4px; line-height: 1.25; }
+  .cell .more { font-size: 10px; padding: 2px 5px; }
+  .cell .add-here { opacity: 1; width: 18px; height: 18px; font-size: 12px; right: 4px; bottom: 4px; background: transparent; }
+  .search { margin-bottom: 18px; }
+  .page-head { margin-bottom: 14px; }
+}

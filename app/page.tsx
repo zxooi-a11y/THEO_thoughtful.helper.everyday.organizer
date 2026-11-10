@@ -34,8 +34,17 @@ export default function CalendarPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [statsOpen, setStatsOpen] = useState(true);
 
   useEffect(() => { const t = localToday(); setToday(t); setCursor(t); }, []);
+
+  // Analytics section: remembers open/closed on this device; on a phone it starts collapsed so the calendar gets the space.
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem("theo:statsOpen"); } catch {}
+    setStatsOpen(saved ? saved === "1" : window.matchMedia("(min-width: 861px)").matches);
+  }, []);
+  const toggleStats = () => setStatsOpen((o) => { try { localStorage.setItem("theo:statsOpen", o ? "0" : "1"); } catch {} return !o; });
 
   // Visible date range for the current view.
   const days = useMemo(() => {
@@ -157,9 +166,14 @@ export default function CalendarPage() {
 
       <div className="cal-layout">
         <section>
-          <h2>Life performance analytics</h2>
-          <div className="muted small" style={{ marginTop: 6 }}>How you&apos;re keeping up with everything on your plate</div>
-          <KpiCards stats={stats} />
+          <button type="button" className="stats-toggle" onClick={toggleStats} aria-expanded={statsOpen} aria-controls="stats-body">
+            <span>
+              <h2>Life performance analytics</h2>
+              <span className="muted small stats-sub">How you&apos;re keeping up with everything on your plate</span>
+            </span>
+            <span className="stats-chev" aria-hidden>{statsOpen ? "Hide" : "Show"} <i className={statsOpen ? "open" : ""} /></span>
+          </button>
+          {statsOpen && <div id="stats-body"><KpiCards stats={stats} /></div>}
 
           <div className="cal-head">
             <h2 style={{ fontSize: 18 }}>{heading}</h2>
