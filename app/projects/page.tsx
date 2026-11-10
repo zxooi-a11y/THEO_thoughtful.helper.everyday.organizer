@@ -4,6 +4,7 @@ import { COLOR_KEYS, colorOf } from "@/lib/colors";
 import type { Project, Task } from "@/lib/types";
 import { api, localToday, relDue } from "@/components/client";
 import ProjectSelect from "@/components/ProjectSelect";
+import TaskEditor from "@/components/TaskEditor";
 import { PlusIcon } from "@/components/Icons";
 
 const PALETTE = COLOR_KEYS.filter((k) => k !== "gray");
@@ -24,6 +25,7 @@ export default function ProjectsPage() {
   const [name, setName] = useState("");
   const [color, setColor] = useState("blue");
   const [editing, setEditing] = useState<{ id: number; name: string; color: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [error, setError] = useState("");
   const [today, setToday] = useState("");
 
@@ -116,7 +118,8 @@ export default function ProjectsPage() {
                 {list.length === 0 && <div className="muted small" style={{ padding: "10px 0" }}>Nothing open.</div>}
                 {list.slice(0, 12).map((t) => (
                   <div key={t.id} className="list-row">
-                    <div className="grow">
+                    <div className="grow" role="button" tabIndex={0} style={{ cursor: "pointer" }} onClick={() => setEditingTask(t)}
+                      onKeyDown={(e) => e.key === "Enter" && setEditingTask(t)} title="Edit task">
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{t.title}</div>
                       <div className="muted small">{relDue(t.due_date, today)}</div>
                     </div>
@@ -130,6 +133,10 @@ export default function ProjectsPage() {
           );
         })}
       </div>
+      {editingTask && (
+        <TaskEditor key={editingTask.id} task={editingTask} projects={projects} today={today}
+          onClose={() => setEditingTask(null)} onSaved={() => { setEditingTask(null); load(); }} />
+      )}
     </>
   );
 }

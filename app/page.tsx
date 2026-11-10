@@ -7,6 +7,7 @@ import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
 import TaskDetail from "@/components/TaskDetail";
+import TaskEditor from "@/components/TaskEditor";
 import { api, fmtDate, localToday, MONTH_LONG, relDue, WEEKDAY } from "@/components/client";
 import { BellIcon, CalendarIcon, ChevronL, ChevronR, PlusIcon, SearchIcon } from "@/components/Icons";
 
@@ -30,6 +31,7 @@ export default function CalendarPage() {
   const [search, setSearch] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editing, setEditing] = useState<Task | null>(null);
   const [adding, setAdding] = useState<{ date: string | null } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -134,13 +136,22 @@ export default function CalendarPage() {
     );
   };
 
+  // Select a task. On a phone the details panel is far below the calendar, so a tap opens the editor instead.
+  const isPhone = () => typeof window !== "undefined" && window.matchMedia("(max-width: 860px)").matches;
+  const openTask = (t: Task) => { setSelectedId(t.id); if (isPhone()) setEditing(t); };
+  const showPanel = (id: number) => {
+    setSelectedId(id);
+    if (isPhone()) setTimeout(() => document.getElementById("task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+
   const chip = (t: Task) => {
     const c = colorOf(projectById.get(t.project_id ?? -1)?.color);
     return (
       <button key={t.id} draggable className={`chip ${t.status === "done" ? "done" : ""} ${selected?.id === t.id ? "sel" : ""}`}
         style={{ background: c.bg, color: c.fg }} title={t.title}
         onDragStart={(e) => e.dataTransfer.setData("text/plain", String(t.id))}
-        onClick={(e) => { e.stopPropagation(); setSelectedId(t.id); }}>
+        onClick={(e) => { e.stopPropagation(); openTask(t); }}
+        onDoubleClick={(e) => { e.stopPropagation(); setEditing(t); }}>
         {t.priority === 1 && "! "}{t.title}
       </button>
     );
@@ -211,7 +222,7 @@ export default function CalendarPage() {
                 const p = projectById.get(t.project_id ?? -1); const c = colorOf(p?.color);
                 const done = t.steps.filter((s) => s.done).length;
                 return (
-                  <div key={t.id} className="day-item" onClick={() => setSelectedId(t.id)}>
+                  <div key={t.id} className="day-item" onClick={() => openTask(t)} onDoubleClick={() => setEditing(t)}>
                     <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
                     <div className="grow">
                       <div style={{ fontWeight: 700, textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</div>
@@ -251,7 +262,7 @@ export default function CalendarPage() {
             {doing.map((t) => {
               const c = colorOf(projectById.get(t.project_id ?? -1)?.color);
               return (
-                <div key={t.id} className="atwork-item" onClick={() => setSelectedId(t.id)}>
+                <div key={t.id} className="atwork-item" onClick={() => showPanel(t.id)}>
                   <span className="chip" style={{ background: c.bg, color: c.fg, maxWidth: 210 }}>{t.title}</span>
                   <span className="muted small">{t.estimate || relDue(t.due_date, today)}</span>
                 </div>
@@ -259,7 +270,7 @@ export default function CalendarPage() {
             })}
           </div>
           {selected ? (
-            <TaskDetail task={selected} projects={projects} today={today} onChange={onTaskChange} />
+            <TaskDetail task={selected} projects={projects} today={today} onChange={onTaskChange} onEdit={() => setEditing(selected)} />
           ) : (
             <div className="soft-card empty">
               <p>No tasks yet.</p>
@@ -270,6 +281,11 @@ export default function CalendarPage() {
       </div>
 
       <button className="fab" onClick={() => setAdding({ date: null })}><PlusIcon size={18} /> Add tasks</button>
+
+      {editing && (
+        <TaskEditor key={editing.id} task={editing} projects={projects} today={today}
+          onClose={() => setEditing(null)} onSaved={(t) => { setEditing(null); onTaskChange(t); }} />
+      )}
 
       {adding && (
         <BulkAdd projects={projects} today={today} defaultDate={adding.date}

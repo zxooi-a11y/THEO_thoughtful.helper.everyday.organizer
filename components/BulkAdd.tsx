@@ -175,11 +175,11 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                       onChange={(id) => setSingle((s) => ({ ...s, projectId: id }))} />
                   </label>
                   <label className="stack" style={{ gap: 6 }}>
-                    <span className="small" style={{ fontWeight: 700 }}>Due date</span>
-                    <div className="row" style={{ gap: 6 }}>
-                      <input type="date" className="input" value={single.dueDate} onChange={(e) => setSingle({ ...single, dueDate: e.target.value })} />
-                      {single.dueDate && <button type="button" className="btn ghost small" onClick={() => setSingle({ ...single, dueDate: "" })}>Auto</button>}
-                    </div>
+                    <span className="row between" style={{ minHeight: 22 }}>
+                      <span className="small" style={{ fontWeight: 700 }}>Due date</span>
+                      {single.dueDate && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => setSingle({ ...single, dueDate: "" })}>Auto</button>}
+                    </span>
+                    <input type="date" className="input" value={single.dueDate} onChange={(e) => setSingle({ ...single, dueDate: e.target.value })} />
                   </label>
                 </div>
                 <textarea className="textarea" style={{ minHeight: 60 }} placeholder="Notes (optional)" value={single.notes} onChange={(e) => setSingle({ ...single, notes: e.target.value })} />

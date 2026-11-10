@@ -8,10 +8,10 @@ import ProjectSelect from "./ProjectSelect";
 import { FileDrop, FileList, uploadFile, type Insights } from "./files";
 import { CalendarIcon, ClockIcon, FolderIcon, PlusIcon, XIcon } from "./Icons";
 
-type Props = { task: Task; projects: Project[]; today: string; onChange: (t: Task | null) => void };
+type Props = { task: Task; projects: Project[]; today: string; onChange: (t: Task | null) => void; onEdit?: () => void };
 
 /** Right-hand card: the selected task with its steps and actions (like "Product analytics" in the reference). */
-export default function TaskDetail({ task, projects, today, onChange }: Props) {
+export default function TaskDetail({ task, projects, today, onChange, onEdit }: Props) {
   const [steps, setSteps] = useState<Step[]>(task.steps);
   const [notes, setNotes] = useState(task.notes);
   const [title, setTitle] = useState(task.title);
@@ -60,10 +60,13 @@ export default function TaskDetail({ task, projects, today, onChange }: Props) {
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <div className="soft-card detail">
+    <div className="soft-card detail" id="task-panel">
       <div className="row between">
         <span className="chip" style={{ background: c.bg, color: c.fg }}>{project?.name ?? "Inbox"}</span>
-        <span className="muted small">{timeAgo(task.created_at)}</span>
+        <span className="row" style={{ gap: 8 }}>
+          <span className="muted small">{timeAgo(task.created_at)}</span>
+          {onEdit && <button type="button" className="btn small" onClick={onEdit}>✎ Edit</button>}
+        </span>
       </div>
 
       <h3><input className="bare" value={title} onChange={(e) => setTitle(e.target.value)}

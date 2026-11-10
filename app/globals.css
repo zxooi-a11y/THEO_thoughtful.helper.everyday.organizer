@@ -374,3 +374,7 @@ input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-dat
 .row-files .tag { display: inline-flex; align-items: center; gap: 4px; }
 .row-files button { border: 0; background: transparent; padding: 0 2px; color: inherit; line-height: 1; }
 .ev-files { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: auto; margin-right: 6px; white-space: nowrap; }
+
+/* Editing */
+#task-panel { scroll-margin-top: 84px; }
+.cell .chip:hover { filter: brightness(.97); }

@@ -2,13 +2,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { colorOf } from "@/lib/colors";
 import type { Project, Task } from "@/lib/types";
-import { api, fmtDate } from "@/components/client";
+import { api, fmtDate, localToday } from "@/components/client";
 import { SearchIcon } from "@/components/Icons";
+import TaskEditor from "@/components/TaskEditor";
 
 export default function ArchivePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [q, setQ] = useState("");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const load = useCallback(async () => {
     const [t, p] = await Promise.all([api<Task[]>(`/api/tasks?archived=1${q ? `&q=${encodeURIComponent(q)}` : ""}`), api<Project[]>("/api/projects")]);
@@ -37,12 +39,17 @@ export default function ArchivePage() {
                 <div style={{ fontWeight: 600 }}>{t.title}</div>
                 <div className="muted small">{t.completed_at ? `Done ${fmtDate(t.completed_at.slice(0, 10), true)}` : "Archived"} · was due {fmtDate(t.due_date)}</div>
               </div>
+              <button className="btn ghost small" onClick={() => setEditingTask(t)}>Edit</button>
               <button className="btn ghost small" onClick={() => act(t, { status: "todo", archived: false })}>Reopen</button>
               <button className="btn danger small" onClick={() => act(t, null)}>Delete</button>
             </div>
           );
         })}
       </div>
+      {editingTask && (
+        <TaskEditor key={editingTask.id} task={editingTask} projects={projects} today={localToday()}
+          onClose={() => setEditingTask(null)} onSaved={() => { setEditingTask(null); load(); }} />
+      )}
     </>
   );
 }
