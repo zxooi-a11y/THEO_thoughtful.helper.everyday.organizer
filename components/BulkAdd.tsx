@@ -9,6 +9,7 @@ import { endTimeProblem, eventTheme } from "@/lib/events";
 import { api, } from "./client";
 import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
+import DateField from "./DateField";
 import { SparkIcon, XIcon } from "./Icons";
 
 const PLACEHOLDER = "Type or paste your tasks and events here, one per line…";
@@ -223,7 +224,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                       <span className="small" style={{ fontWeight: 700 }}>Due date</span>
                       {single.dueDate && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => setSingle({ ...single, dueDate: "" })}>Auto</button>}
                     </span>
-                    <input type="date" className="input" value={single.dueDate} onChange={(e) => setSingle({ ...single, dueDate: e.target.value })} />
+                    <DateField placeholder="Auto" value={single.dueDate} onChange={(v) => setSingle({ ...single, dueDate: v })} />
                   </label>
                 </div>
                 <textarea className="textarea" style={{ minHeight: 60 }} placeholder="Notes (optional)" value={single.notes} onChange={(e) => setSingle({ ...single, notes: e.target.value })} />
@@ -307,11 +308,11 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                       <div className="ev-fields four" style={{ marginTop: 8 }}>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">Date</span>
-                          <input type="date" className="input" value={d.ev.start_date} onChange={(e) => updEv(i, { start_date: e.target.value, dateFound: true, dateReason: "You picked it" })} />
+                          <DateField required value={d.ev.start_date} onChange={(v) => updEv(i, { start_date: v, dateFound: true, dateReason: "You picked it" })} />
                         </label>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">End date</span>
-                          <input type="date" className="input" min={d.ev.start_date} value={d.ev.end_date} onChange={(e) => updEv(i, { end_date: e.target.value })} />
+                          <DateField min={d.ev.start_date} value={d.ev.end_date} placeholder="Single day" onChange={(v) => updEv(i, { end_date: v })} />
                         </label>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">Start time</span>
@@ -381,7 +382,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                     </div>
                   </div>
                   <div>
-                    <input type="date" className="input" value={d.dueDate} onChange={(e) => upd(i, { dueDate: e.target.value, dueReason: "You picked it" })} />
+                    <DateField required value={d.dueDate} onChange={(v) => upd(i, { dueDate: v, dueReason: "You picked it" })} />
                     <div className="why">{d.dueReason}</div>
                   </div>
                   <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove"><XIcon size={16} /></button>

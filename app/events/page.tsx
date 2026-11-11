@@ -4,6 +4,7 @@ import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from 
 import type { EventHints } from "@/lib/brain";
 import type { FileMeta, Project } from "@/lib/types";
 import ProjectSelect from "@/components/ProjectSelect";
+import DateField from "@/components/DateField";
 import ProjectColorRow from "@/components/ProjectColorRow";
 import EventCard from "@/components/EventCard";
 import { api, fmtDate, localToday } from "@/components/client";
@@ -255,11 +256,11 @@ export default function EventsPage() {
             <div className="form-row">
               <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Date</span>
-                <input type="date" className="input" required value={draft.start_date} onChange={(e) => upd({ start_date: e.target.value })} />
+                <DateField required value={draft.start_date} onChange={(v) => upd({ start_date: v })} />
               </label>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>End date <span className="muted">(multi-day)</span></span>
-                <input type="date" className="input" min={draft.start_date} value={draft.end_date} onChange={(e) => upd({ end_date: e.target.value })} />
+                <DateField min={draft.start_date} value={draft.end_date} placeholder="Single day" onChange={(v) => upd({ end_date: v })} />
               </label>
             </div>
 

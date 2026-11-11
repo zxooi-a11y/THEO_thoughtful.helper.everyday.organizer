@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { api } from "./client";
 import ProjectSelect from "./ProjectSelect";
+import DateField from "./DateField";
 import ProjectColorRow from "./ProjectColorRow";
 import { FileDrop, FileList, uploadFile } from "./files";
 import { normalizeWebUrl } from "@/lib/links";
@@ -130,7 +131,7 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
               <span className="small" style={{ fontWeight: 700 }}>Due date</span>
               {due && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => setDue("")}>Clear</button>}
             </span>
-            <input type="date" className="input" value={due} onChange={(e) => setDue(e.target.value)} />
+            <DateField placeholder="No due date" value={due} onChange={setDue} />
             {task.due_reason && due === (task.due_date ?? "") && <span className="muted small">THEO: {task.due_reason}</span>}
           </label>
           <label className="stack" style={{ gap: 6 }}>

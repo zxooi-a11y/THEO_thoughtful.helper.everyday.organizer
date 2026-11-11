@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { GoalPlan, PlannedTask } from "@/lib/brain";
 import type { Task } from "@/lib/types";
+import DateField from "@/components/DateField";
 import { api, fmtDate, localToday, relDue } from "@/components/client";
 import { PlusIcon, SparkIcon, XIcon } from "@/components/Icons";
 
@@ -99,7 +100,7 @@ export default function PlanPage() {
                     placeholder="Sub-steps, one per line" onChange={(e) => upd(i, { steps: e.target.value.split("\n") })} />
                 </div>
                 <div className="input-date">
-                  <input type="date" className="input" value={t.dueDate} onChange={(e) => upd(i, { dueDate: e.target.value })} />
+                  <DateField required value={t.dueDate} onChange={(v) => upd(i, { dueDate: v })} />
                   <div className="muted small" style={{ marginTop: 4 }}>{relDue(t.dueDate, today)}</div>
                 </div>
                 <input className="input input-est" placeholder="Estimate" value={t.estimate} onChange={(e) => upd(i, { estimate: e.target.value })} />

@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { EventDraft } from "@/lib/brain/events";
 import type { Project } from "@/lib/types";
 import ProjectSelect from "./ProjectSelect";
+import DateField from "./DateField";
 import { endTimeProblem, eventTheme } from "@/lib/events";
 import { api } from "./client";
 import { SparkIcon, XIcon } from "./Icons";
@@ -114,11 +115,11 @@ export default function EventBatchAdd({ today, projects: initialProjects, seed =
                     <div className="ev-fields four" style={{ marginTop: 8 }}>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">Date</span>
-                        <input type="date" className="input" value={r.start_date} onChange={(e) => upd(i, { start_date: e.target.value, dateFound: true, dateReason: "You picked it" })} />
+                        <DateField required value={r.start_date} onChange={(v) => upd(i, { start_date: v, dateFound: true, dateReason: "You picked it" })} />
                       </label>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">End date</span>
-                        <input type="date" className="input" min={r.start_date} value={r.end_date} onChange={(e) => upd(i, { end_date: e.target.value })} />
+                        <DateField min={r.start_date} value={r.end_date} placeholder="Single day" onChange={(v) => upd(i, { end_date: v })} />
                       </label>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">Start time</span>

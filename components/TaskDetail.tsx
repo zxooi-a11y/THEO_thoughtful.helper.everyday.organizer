@@ -5,6 +5,7 @@ import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { addDays } from "@/lib/brain/dates";
 import { api, relDue, timeAgo } from "./client";
 import ProjectSelect from "./ProjectSelect";
+import DateField from "./DateField";
 import FinalWorkLink from "./FinalWork";
 import { normalizeWebUrl } from "@/lib/links";
 import { FileDrop, FileList, uploadFile, type Insights } from "./files";
@@ -171,7 +172,7 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
 
       <div className="meta">
         <div className="row"><CalendarIcon size={18} />
-          <input type="date" className="bare" style={{ width: "auto" }} value={task.due_date ?? ""} onChange={(e) => patch({ due_date: e.target.value || null })} />
+          <DateField className="bare" placeholder="No due date" value={task.due_date ?? ""} onChange={(v) => patch({ due_date: v || null })} />
           <span className="muted small">{relDue(task.due_date, today)}</span>
         </div>
         {task.due_reason && <div className="muted small" style={{ marginTop: -6, paddingLeft: 28 }}>THEO: {task.due_reason}</div>}
