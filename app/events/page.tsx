@@ -161,6 +161,8 @@ export default function EventsPage() {
   const upcoming = shown.filter((e) => (e.end_date ?? e.start_date) >= today);
   const past = shown.filter((e) => (e.end_date ?? e.start_date) < today).reverse();
   const kindsUsed = EVENT_KINDS.filter((k) => events.some((e) => e.kind === k.key));
+  // No type picker: the colour/label follows the title. New events always follow it; existing ones only change when the title clearly says something.
+  const kindFor = (title: string) => { const k = detectKind(title); return draft?.autoKind || k !== "other" ? { kind: k } : {}; };
   const timeIssue = draft ? endTimeProblem(draft.start_time, draft.end_time, draft.end_date) : "";
   const upd = (p: Partial<Draft>) => setDraft((d) => d && { ...d, ...p });
 
@@ -179,11 +181,9 @@ export default function EventsPage() {
           <button className={`pill ${filter === "all" ? "on-dark" : ""}`} onClick={() => setFilter("all")}>All</button>
           <button className={`pill ${filter === "fav" ? "on-dark" : ""}`} onClick={() => setFilter("fav")}>♥ Favourites</button>
           {projects.length > 0 && (
-            <select className="pill" style={{ paddingRight: 8 }} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filter by project tag">
-              <option value="">All projects</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              <option value="none">No project</option>
-            </select>
+            <ProjectSelect className="pill-combo" projects={projects} allowCreate={false} emptyLabel="All projects" extra={[{ label: "No project", value: -1 }]}
+              value={projectFilter === "" ? null : projectFilter === "none" ? -1 : Number(projectFilter)}
+              onChange={(id) => setProjectFilter(id == null ? "" : id === -1 ? "none" : String(id))} title="Filter by project tag" />
           )}
           {kindsUsed.map((k) => (
             <button key={k.key} className="pill" onClick={() => setFilter(k.key)}
@@ -241,18 +241,8 @@ export default function EventsPage() {
             <label className="stack" style={{ gap: 6 }}>
               <span className="small" style={{ fontWeight: 700 }}>What's happening?</span>
               <input className="input" style={{ padding: 14, fontSize: 16 }} autoFocus required placeholder="e.g. Sarah & Tom's wedding, Bali holiday, Google interview"
-                value={draft.title} onChange={(e) => upd({ title: e.target.value, ...(draft.autoKind ? { kind: detectKind(e.target.value) } : {}) })} />
+                value={draft.title} onChange={(e) => upd({ title: e.target.value, ...kindFor(e.target.value) })} />
             </label>
-
-            <div className="stack" style={{ gap: 6 }}>
-              <span className="small" style={{ fontWeight: 700 }}>Type {draft.autoKind && draft.title && <span className="muted">· picked automatically</span>}</span>
-              <div className="row wrap" style={{ gap: 6 }}>
-                {EVENT_KINDS.map((k) => (
-                  <button type="button" key={k.key} className="pill" onClick={() => upd({ kind: k.key, autoKind: false })}
-                    style={draft.kind === k.key ? { background: k.pill, color: k.accent, borderColor: k.accent } : undefined}>{k.label}</button>
-                ))}
-              </div>
-            </div>
 
             <label className="stack" style={{ gap: 6 }}>
               <span className="small" style={{ fontWeight: 700 }}>Project tag <span className="muted">· groups it with related tasks</span></span>

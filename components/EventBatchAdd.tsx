@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { EventDraft } from "@/lib/brain/events";
 import type { Project } from "@/lib/types";
 import ProjectSelect from "./ProjectSelect";
-import { endTimeProblem, EVENT_KINDS, kindOf } from "@/lib/events";
+import { endTimeProblem, kindOf } from "@/lib/events";
 import { api } from "./client";
 import { SparkIcon, XIcon } from "./Icons";
 
@@ -104,13 +104,14 @@ export default function EventBatchAdd({ today, projects: initialProjects, seed =
                       <input className="input grow" style={{ fontWeight: 700 }} value={r.title} aria-label="Event name" onChange={(e) => upd(i, { title: e.target.value })} />
                       <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove event"><XIcon size={16} /></button>
                     </div>
-                    <div className="ev-fields">
+                    <div className="ev-fields one">
                       <label className="stack" style={{ gap: 4 }}>
-                        <span className="small muted">Type</span>
-                        <select className="select" value={r.kind} onChange={(e) => upd(i, { kind: e.target.value })}>
-                          {EVENT_KINDS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-                        </select>
+                        <span className="small muted">Project tag</span>
+                        <ProjectSelect projects={projects} value={r.project_id} onChange={(id) => upd(i, { project_id: id })}
+                          onCreated={(p) => setProjects((ps) => (ps.some((x) => x.id === p.id) ? ps : [...ps, p]))} />
                       </label>
+                    </div>
+                    <div className="ev-fields four" style={{ marginTop: 8 }}>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">Date</span>
                         <input type="date" className="input" value={r.start_date} onChange={(e) => upd(i, { start_date: e.target.value, dateFound: true, dateReason: "You picked it" })} />
@@ -129,13 +130,6 @@ export default function EventBatchAdd({ today, projects: initialProjects, seed =
                       </label>
                     </div>
                     <div className={`why${r.dateFound ? "" : " warn"}`}>{r.dateReason}</div>
-                    <div className="ev-fields two">
-                      <label className="stack" style={{ gap: 4 }}>
-                        <span className="small muted">Project tag</span>
-                        <ProjectSelect projects={projects} value={r.project_id} onChange={(id) => upd(i, { project_id: id })}
-                          onCreated={(p) => setProjects((ps) => (ps.some((x) => x.id === p.id) ? ps : [...ps, p]))} />
-                      </label>
-                    </div>
                     <div className="ev-fields two">
                       <input className="input" placeholder="Location" value={r.location} onChange={(e) => upd(i, { location: e.target.value })} aria-label="Location" />
                       <input className="input" placeholder="Link (optional)" inputMode="url" autoCapitalize="none" value={r.url} onChange={(e) => upd(i, { url: e.target.value })} aria-label="Link" />

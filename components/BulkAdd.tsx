@@ -5,7 +5,7 @@ import type { FileMeta, Project } from "@/lib/types";
 import type { TaskDraft } from "@/lib/brain";
 import type { EventDraft } from "@/lib/brain/events";
 import type { EntryType } from "@/lib/brain/entryType";
-import { endTimeProblem, EVENT_KINDS, kindOf } from "@/lib/events";
+import { endTimeProblem, kindOf } from "@/lib/events";
 import { api, } from "./client";
 import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
@@ -297,20 +297,14 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                         <input className="input grow" style={{ fontWeight: 700 }} value={d.title} aria-label="Event name" onChange={(e) => upd(i, { title: e.target.value })} />
                         <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove"><XIcon size={16} /></button>
                       </div>
-                      <div className="ev-fields two">
+                      <div className="ev-fields one">
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">Project tag</span>
                           <ProjectSelect projects={projects} value={d.projectId} onCreated={addProject}
                             onChange={(id) => upd(i, { projectId: id, projectName: projects.find((p) => p.id === id)?.name ?? null })} />
                         </label>
-                        <label className="stack" style={{ gap: 4 }}>
-                          <span className="small muted">Type</span>
-                          <select className="select" value={d.ev.kind} onChange={(e) => updEv(i, { kind: e.target.value })}>
-                            {EVENT_KINDS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-                          </select>
-                        </label>
                       </div>
-                      <div className="ev-fields" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+                      <div className="ev-fields four" style={{ marginTop: 8 }}>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">Date</span>
                           <input type="date" className="input" value={d.ev.start_date} onChange={(e) => updEv(i, { start_date: e.target.value, dateFound: true, dateReason: "You picked it" })} />

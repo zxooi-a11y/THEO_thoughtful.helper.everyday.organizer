@@ -8,6 +8,7 @@ import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
 import TaskDetail from "@/components/TaskDetail";
 import TaskEditor from "@/components/TaskEditor";
+import ProjectSelect from "@/components/ProjectSelect";
 import { api, fmtDate, localToday, MONTH_LONG, relDue, WEEKDAY } from "@/components/client";
 import { BellIcon, CalendarIcon, ChevronL, ChevronR, PlusIcon, SearchIcon } from "@/components/Icons";
 
@@ -169,10 +170,8 @@ export default function CalendarPage() {
       <div className="search">
         <SearchIcon />
         <input placeholder="Task search" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filter by project">
-          <option value="">By topic name</option>
-          {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <ProjectSelect className="bare" projects={projects} allowCreate={false} emptyLabel="By topic name"
+          value={projectFilter ? Number(projectFilter) : null} onChange={(id) => setProjectFilter(id == null ? "" : String(id))} title="Filter by project" />
       </div>
 
       {error && <div className="err" style={{ marginBottom: 20 }}>{error}</div>}
