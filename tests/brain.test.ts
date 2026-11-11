@@ -268,3 +268,14 @@ test("batch events: long schedule lines split into title, place and description"
   assert.equal(e("Sarah & Tom's wedding 12 Dec 2026 4pm at Kuala Lumpur").notes, "");
   assert.equal(e("Kuala Lumpur: Sarah's wedding 12 Dec").location, "Kuala Lumpur");
 });
+
+test("entries are guessed as task or event", async () => {
+  const { guessEntryType } = await import("../lib/brain/index.ts");
+  const g = guessEntryType;
+  // Things you DO
+  for (const l of ["Finance Lang Backdrop design", "Pay electricity bill by Friday", "Book dentist appointment", "Plan Sarah's birthday party next week",
+    "Email the supplier", "Buy a gift for Mum", "Prepare the Invest Fair booth", "Dentist"]) assert.equal(g(l), "task", l);
+  // Things that HAPPEN
+  for (const l of ["Finance Lang Invest Fair 12 Dec", "Sarah & Tom's wedding", "Bali holiday 20-27 Dec", "Google interview", "AWS Summit 24/11",
+    "Mum's 60th birthday party", "Hot Flow Yoga class", "Coffee with Jo 3pm"]) assert.equal(g(l), "event", l);
+});

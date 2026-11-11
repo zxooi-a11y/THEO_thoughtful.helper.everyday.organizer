@@ -19,7 +19,7 @@ export const EVENT_KINDS: EventKind[] = [
   { key: "trip",       label: "Trip",        accent: "#1F7AE0", panel: "#EAF3FD", pill: "#D4E6FB", re: /\b(trip|travel|flight|fly to|visit to|road ?trip|journey)\b/i },
   { key: "interview",  label: "Interview",   accent: "#4C51BF", panel: "#EEEFFC", pill: "#DDDFF9", re: /\b(interview|assessment|job fair|onboarding|first day)\b/i },
   { key: "class",      label: "Class",       accent: "#4D7C0F", panel: "#F3F9E8", pill: "#E2F0C6", re: /\b(class(?:es)?|lesson|session|training|workout|course|lecture)\b|pilates|yoga|reformer|bootcamp|hiit|barre|strength/i },
-  { key: "conference", label: "Conference",  accent: "#D61F69", panel: "#FDEFF5", pill: "#FBDCE9", re: /\b(conference|summit|expo|meetup|convention|workshop|seminar|webinar|market)\b/i },
+  { key: "conference", label: "Conference",  accent: "#D61F69", panel: "#FDEFF5", pill: "#FBDCE9", re: /\b(conference|summit|expo|fair|forum|exhibition|meetup|convention|workshop|seminar|webinar|market)\b/i },
   { key: "anniversary",label: "Anniversary", accent: "#C53030", panel: "#FDEEEE", pill: "#FBDADA", re: /\b(anniversary)\b/i },
   { key: "concert",    label: "Concert",     accent: "#B7791F", panel: "#FDF6E7", pill: "#FAEBC8", re: /\b(concert|gig|festival|show|theatre|theater|match|game)\b/i },
   { key: "appointment",label: "Appointment", accent: "#2F855A", panel: "#EAF7EF", pill: "#D3EFDD", re: /\b(appointment|doctor|dentist|surgery|check-?up)\b/i },
@@ -48,6 +48,8 @@ export type LifeEvent = {
   url: string;
   notes: string;
   favorite: boolean;
+  /** The project tag this event sits under (tasks use the same tags). */
+  project_id: number | null;
   created_at: string;
   files: FileMeta[];
 };

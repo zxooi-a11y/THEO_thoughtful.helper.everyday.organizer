@@ -20,7 +20,8 @@ export function listProjects() {
   return q<Project>(`
     SELECT p.id, p.name, p.color,
       (SELECT count(*)::int FROM tasks t WHERE t.project_id = p.id AND t.status <> 'done' AND NOT t.archived) AS open_count,
-      (SELECT count(*)::int FROM tasks t WHERE t.project_id = p.id AND t.status = 'done') AS done_count
+      (SELECT count(*)::int FROM tasks t WHERE t.project_id = p.id AND t.status = 'done') AS done_count,
+      (SELECT count(*)::int FROM events e WHERE e.project_id = p.id AND COALESCE(e.end_date, e.start_date) >= CURRENT_DATE - 1) AS event_count
     FROM projects p ORDER BY p.name`);
 }
 

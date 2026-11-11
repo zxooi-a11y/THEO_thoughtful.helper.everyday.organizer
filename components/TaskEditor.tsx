@@ -14,6 +14,8 @@ type Props = {
   onClose: () => void;
   /** Called with the saved task, or null when it was deleted. */
   onSaved: (t: Task | null) => void;
+  /** Called after the task was turned into an event (it no longer exists as a task). */
+  onConverted?: () => void;
 };
 
 const PRIORITIES: { v: 1 | 2 | 3; label: string }[] = [{ v: 1, label: "High" }, { v: 2, label: "Normal" }, { v: 3, label: "Low" }];
@@ -25,7 +27,7 @@ const STATUSES: { v: Task["status"]; label: string }[] = [
 const parseTags = (s: string) => [...new Set(s.split(/[,\s]+/).map((t) => t.replace(/^#/, "").trim().toLowerCase()).filter(Boolean))].slice(0, 10);
 
 /** Edit everything about a task in one place. Saving sends one update; THEO learns from project and step changes. */
-export default function TaskEditor({ task, projects: initialProjects, today, onClose, onSaved }: Props) {
+export default function TaskEditor({ task, projects: initialProjects, today, onClose, onSaved, onConverted }: Props) {
   const [projects, setProjects] = useState(initialProjects);
   const [title, setTitle] = useState(task.title);
   const [projectId, setProjectId] = useState<number | null>(task.project_id);
@@ -69,6 +71,13 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
     if (!confirm(`Delete “${task.title}”? This can't be undone.`)) return;
     setBusy(true);
     try { await api(`/api/tasks/${task.id}`, { method: "DELETE" }); onSaved(null); }
+    catch (er) { setError((er as Error).message); setBusy(false); }
+  }
+
+  async function convertToEvent() {
+    if (!confirm(`Turn “${task.title}” into an event? Its due date becomes the event date; steps and notes move into the description. It keeps its project tag and files.`)) return;
+    setBusy(true); setError("");
+    try { await api("/api/convert", { body: { from: "task", id: task.id, today } }); onConverted?.(); onSaved(null); }
     catch (er) { setError((er as Error).message); setBusy(false); }
   }
 
@@ -181,7 +190,10 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
         {error && <div className="err">{error}</div>}
 
         <div className="row between wrap">
-          <button type="button" className="btn danger" disabled={busy} onClick={remove}>Delete</button>
+          <div className="row" style={{ gap: 4 }}>
+            <button type="button" className="btn danger" disabled={busy} onClick={remove}>Delete</button>
+            <button type="button" className="btn ghost" disabled={busy} onClick={convertToEvent} title="Turn this task into an event">Convert to event</button>
+          </div>
           <div className="row">
             <button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button>
             <button className="btn primary" disabled={busy || uploading || !title.trim()}>{busy ? "Saving…" : "Save changes"}</button>

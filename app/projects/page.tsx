@@ -2,9 +2,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { COLOR_KEYS, colorOf } from "@/lib/colors";
 import type { Project, Task } from "@/lib/types";
-import { api, localToday, relDue } from "@/components/client";
+import { api, fmtDate, localToday, relDue } from "@/components/client";
 import ProjectSelect from "@/components/ProjectSelect";
 import TaskEditor from "@/components/TaskEditor";
+import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
 import { PlusIcon } from "@/components/Icons";
 
 const PALETTE = COLOR_KEYS.filter((k) => k !== "gray");
@@ -26,13 +27,15 @@ export default function ProjectsPage() {
   const [color, setColor] = useState("blue");
   const [editing, setEditing] = useState<{ id: number; name: string; color: string } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [events, setEvents] = useState<LifeEvent[]>([]);
   const [error, setError] = useState("");
   const [today, setToday] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [p, t] = await Promise.all([api<Project[]>("/api/projects"), api<Task[]>("/api/tasks")]);
-      setProjects(p); setTasks(t.filter((x) => x.status !== "done")); setError("");
+      const today = localToday();
+      const [p, t, ev] = await Promise.all([api<Project[]>("/api/projects"), api<Task[]>("/api/tasks"), api<LifeEvent[]>(`/api/events?from=${today}`)]);
+      setEvents(ev); setProjects(p); setTasks(t.filter((x) => x.status !== "done")); setError("");
     } catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => { setToday(localToday()); load(); }, [load]);
@@ -62,7 +65,12 @@ export default function ProjectsPage() {
     load();
   }
 
-  const count = (p: Project) => tasks.filter((t) => t.project_id === p.id).length;
+  const count = (p: Project) => tasks.filter((t) => t.project_id === p.id).length + events.filter((e) => e.project_id === p.id).length;
+
+  async function moveEvent(e: LifeEvent, projectId: number | null) {
+    await api(`/api/events/${e.id}`, { method: "PATCH", body: { project_id: projectId } });
+    load();
+  }
   // Busiest projects first, then the rest alphabetically; Inbox last.
   const groups: (Project | null)[] = [...projects].sort((a, b) => count(b) - count(a) || a.name.localeCompare(b.name));
   groups.push(null);
@@ -72,7 +80,7 @@ export default function ProjectsPage() {
       <div className="page-head"><h1>Projects</h1></div>
 
       <form className="card stack" style={{ marginBottom: 12 }} onSubmit={add}>
-        <h2>Add your own project</h2>
+        <div><h2>Add your own project</h2><div className="muted small" style={{ marginTop: 4 }}>A project is a tag that groups related tasks <b>and</b> events, e.g. “Finance Lang”.</div></div>
         <div className="row wrap">
           <input className="input grow" style={{ minWidth: 220 }} placeholder="e.g. Wedding, Side hustle, Kids, Renovation" value={name} onChange={(e) => setName(e.target.value)} />
           <Swatches value={color} onPick={setColor} />
@@ -87,7 +95,13 @@ export default function ProjectsPage() {
       <div className="cards">
         {groups.map((p) => {
           const list = tasks.filter((t) => t.project_id === (p?.id ?? null));
-          if (!p && !list.length) return null;
+          const evs = events.filter((e) => (e.project_id ?? null) === (p?.id ?? null));
+          // Tasks and events under one tag, in date order (undated tasks last).
+          const entries = [
+            ...evs.map((e) => ({ type: "event" as const, date: e.start_date, e })),
+            ...list.map((t) => ({ type: "task" as const, date: t.due_date ?? "9999", t })),
+          ].sort((a, b) => a.date.localeCompare(b.date));
+          if (!p && !entries.length) return null;
           const c = colorOf(p?.color);
           const isEditing = p && editing?.id === p.id;
           return (
@@ -109,25 +123,36 @@ export default function ProjectsPage() {
                 <div className="row between">
                   <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
                   <span className="row" style={{ gap: 4 }}>
-                    <span className="muted small">{list.length} open · {p?.done_count ?? 0} done</span>
+                    <span className="muted small">{list.length} task{list.length === 1 ? "" : "s"} · {evs.length} event{evs.length === 1 ? "" : "s"} · {p?.done_count ?? 0} done</span>
                     {p && <button className="btn ghost small" style={{ padding: "4px 8px" }} onClick={() => setEditing({ id: p.id, name: p.name, color: p.color })}>Edit</button>}
                   </span>
                 </div>
               )}
               <div style={{ marginTop: 10 }}>
-                {list.length === 0 && <div className="muted small" style={{ padding: "10px 0" }}>Nothing open.</div>}
-                {list.slice(0, 12).map((t) => (
+                {entries.length === 0 && <div className="muted small" style={{ padding: "10px 0" }}>Nothing open.</div>}
+                {entries.slice(0, 12).map((en) => en.type === "event" ? (
+                  <div key={`e${en.e.id}`} className="list-row">
+                    <div className="grow">
+                      <a href={`/events?open=${en.e.id}`} style={{ display: "block" }} title="Open event">
+                        <div className="row" style={{ gap: 6 }}><span className="tag" style={{ background: kindOf(en.e.kind).pill, color: kindOf(en.e.kind).accent }}>Event</span><span style={{ fontWeight: 600, fontSize: 13 }}>{en.e.title}</span></div>
+                        <div className="muted small">{fmtDate(en.e.start_date)}{timeRange(en.e) ? ` · ${timeRange(en.e)}` : ""}</div>
+                      </a>
+                    </div>
+                    <ProjectSelect projects={projects} value={en.e.project_id} style={{ width: 120, padding: "4px 6px", fontSize: 12 }}
+                      onCreated={(np) => setProjects((ps) => [...ps, np])} onChange={(id) => moveEvent(en.e, id)} />
+                  </div>
+                ) : (() => { const t = en.t; return (
                   <div key={t.id} className="list-row">
                     <div className="grow" role="button" tabIndex={0} style={{ cursor: "pointer" }} onClick={() => setEditingTask(t)}
                       onKeyDown={(e) => e.key === "Enter" && setEditingTask(t)} title="Edit task">
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{t.title}</div>
+                      <div className="row" style={{ gap: 6 }}><span className="tag">Task</span><span style={{ fontWeight: 600, fontSize: 13 }}>{t.title}</span></div>
                       <div className="muted small">{relDue(t.due_date, today)}</div>
                     </div>
                     <ProjectSelect projects={projects} value={t.project_id} style={{ width: 120, padding: "4px 6px", fontSize: 12 }}
                       onCreated={(np) => setProjects((ps) => [...ps, np])} onChange={(id) => move(t, id)} />
                   </div>
-                ))}
-                {list.length > 12 && <div className="muted small" style={{ paddingTop: 8 }}>+{list.length - 12} more</div>}
+                ); })())}
+                {entries.length > 12 && <div className="muted small" style={{ paddingTop: 8 }}>+{entries.length - 12} more</div>}
               </div>
             </div>
           );

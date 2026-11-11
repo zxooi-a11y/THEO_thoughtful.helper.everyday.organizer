@@ -32,6 +32,7 @@ export default function CalendarPage() {
   const [projectFilter, setProjectFilter] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
+  const [notice, setNotice] = useState("");
   const [adding, setAdding] = useState<{ date: string | null } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -69,6 +70,7 @@ export default function CalendarPage() {
       if (search) qs.set("q", search);
       if (projectFilter) qs.set("project", projectFilter);
       const range = new URLSearchParams({ from: days[0], to: days[days.length - 1] });
+      if (projectFilter) range.set("project", projectFilter);
       const [t, d, p, s, ev] = await Promise.all([
         api<Task[]>(`/api/tasks?${qs}`),
         api<Task[]>(`/api/tasks?status=doing`),
@@ -174,6 +176,7 @@ export default function CalendarPage() {
       </div>
 
       {error && <div className="err" style={{ marginBottom: 20 }}>{error}</div>}
+      {notice && <div className="hint-banner" role="status" style={{ marginBottom: 20 }}>✓ {notice} <a href="/events" style={{ fontWeight: 700, textDecoration: "underline" }}>Open Events</a></div>}
 
       <div className="cal-layout">
         <section>
@@ -247,7 +250,7 @@ export default function CalendarPage() {
                     {(eventsByDay.get(d) ?? []).map(eventChip)}
                     {show.map(chip)}
                     {list.length > show.length && <button className="more" onClick={() => setExpanded(d)}>+{list.length - show.length}</button>}
-                    <button className="add-here" title="Add tasks for this day" onClick={() => setAdding({ date: d })}>+</button>
+                    <button className="add-here" title="Add a task or event on this day" onClick={() => setAdding({ date: d })}>+</button>
                   </div>
                 );
               })}
@@ -274,17 +277,18 @@ export default function CalendarPage() {
           ) : (
             <div className="soft-card empty">
               <p>No tasks yet.</p>
-              <button className="btn primary" onClick={() => setAdding({ date: null })}>Add your first tasks</button>
+              <button className="btn primary" onClick={() => setAdding({ date: null })}>Add your first entries</button>
             </div>
           )}
         </aside>
       </div>
 
-      <button className="fab" onClick={() => setAdding({ date: null })}><PlusIcon size={18} /> Add tasks</button>
+      <button className="fab" onClick={() => setAdding({ date: null })}><PlusIcon size={18} /> Add</button>
 
       {editing && (
         <TaskEditor key={editing.id} task={editing} projects={projects} today={today}
-          onClose={() => setEditing(null)} onSaved={(t) => { setEditing(null); onTaskChange(t); }} />
+          onClose={() => setEditing(null)} onSaved={(t) => { setEditing(null); onTaskChange(t); }}
+          onConverted={() => setNotice("Converted to an event. Find it on the Events page.")} />
       )}
 
       {adding && (

@@ -10,6 +10,7 @@ export const GET = handle(async (req: Request) => {
   return ok(await listEvents({
     from: isISODate(u.get("from")) ? u.get("from")! : undefined,
     to: isISODate(u.get("to")) ? u.get("to")! : undefined,
+    projectId: Number(u.get("project")) || undefined,
   }));
 });
 
@@ -39,7 +40,10 @@ export const POST = handle(async (req: Request) => {
       ready.push(r.event!);
     }
     const ids: number[] = [];
-    for (const ev of ready) ids.push(await createEvent(ev));
+    for (let i = 0; i < ready.length; i++) {
+      const fileIds = (Array.isArray(list[i]?.fileIds) ? (list[i].fileIds as unknown[]) : []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 10);
+      ids.push(await createEvent({ ...ready[i], fileIds }));
+    }
     return ok({ ids }, 201);
   }
 

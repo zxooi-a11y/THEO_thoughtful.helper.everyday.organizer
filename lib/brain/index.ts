@@ -7,6 +7,8 @@ import { suggestSteps, type LearnedPlan } from "./steps.ts";
 import { tidyTitle } from "./text.ts";
 export { splitBulk } from "./text.ts";
 export { analyzeEvent, analyzeEvents } from "./events.ts";
+export { guessEntryType } from "./entryType.ts";
+export type { EntryType } from "./entryType.ts";
 export type { EventDraft } from "./events.ts";
 import type { FileContext } from "./files.ts";
 

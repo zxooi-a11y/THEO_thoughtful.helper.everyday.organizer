@@ -3,12 +3,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { FileMeta, Project } from "@/lib/types";
 import type { TaskDraft } from "@/lib/brain";
+import type { EventDraft } from "@/lib/brain/events";
+import type { EntryType } from "@/lib/brain/entryType";
+import { endTimeProblem, EVENT_KINDS, kindOf } from "@/lib/events";
 import { api, } from "./client";
 import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
 import { SparkIcon, XIcon } from "./Icons";
 
-const PLACEHOLDER = "Type or paste your tasks here, one per line…";
+const PLACEHOLDER = "Type or paste your tasks and events here, one per line…";
 const BRIEF_PLACEHOLDER = "e.g. All of this is for my candle business, launching at the Christmas market on 12 Dec. Money stuff is urgent.";
 type Mode = "batch" | "single";
 type Aspect = "project" | "due" | "steps" | "title";
@@ -18,6 +21,11 @@ const ASPECTS: { key: Aspect; label: string }[] = [
 
 /** A draft plus what THEO originally suggested and your 👍/👎 on it. */
 type Row = TaskDraft & {
+  /** Is this entry a task (to do) or an event (to attend)? THEO guesses; you can flip it. */
+  type: EntryType;
+  guess: EntryType;
+  /** The event version of the line (date, times, place…); used when type is "event". */
+  ev: EventDraft;
   notes?: string;
   fileIds: number[];
   vote: "up" | "down" | null;
@@ -33,7 +41,9 @@ Fix the leaking kitchen tap ASAP
 Read "Atomic Habits"
 Renew passport before 20 Dec
 Plan Sarah's birthday party next week
-Clean the garage this weekend #home`;
+Clean the garage this weekend #home
+Finance Lang Backdrop design
+Finance Lang Invest Fair 12 Dec 9am - 5pm at KLCC`;
 
 const store = {
   get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -94,7 +104,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
     setBusy(true); setError("");
     store.set("theo:brief", brief);
     try {
-      const r = await api<{ drafts: TaskDraft[]; fileHints: typeof hints }>("/api/analyze", {
+      const r = await api<{ drafts: TaskDraft[]; entries: { type: EntryType; event: EventDraft }[]; fileHints: typeof hints }>("/api/analyze", {
         body: { text: input, today, brief, fileIds: files.map((f) => f.id), useChecklist: mode === "single" },
       });
       setHints(r.fileHints);
@@ -110,25 +120,59 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
         // Clicked a specific day? Use it unless the line itself named a date.
         drafts = drafts.map((d) => (d.dueReason.startsWith("You said") || d.dueReason === "Exact date given" ? d : { ...d, dueDate: defaultDate, dueReason: "Day you picked on the calendar" }));
       }
-      setRows(drafts.map((d) => ({ ...d, fileIds: files.map((f) => f.id), vote: null, aspects: [], suggested: { projectId: d.projectId, dueDate: d.dueDate, steps: d.steps } })));
+      setRows(drafts.map((d, i) => {
+        const guess = r.entries[i]?.type ?? "task";
+        const ev: EventDraft = { ...(r.entries[i]?.event ?? blankEvent(d.title, d.dueDate)) };
+        // A date you picked (single entry) or the calendar day you clicked applies when the line has none.
+        const forced = mode === "single" ? single.dueDate : !ev.dateFound ? defaultDate ?? "" : "";
+        if (forced) { ev.start_date = forced; ev.dateFound = true; ev.dateReason = mode === "single" ? "You picked it" : "Day you picked on the calendar"; }
+        if (mode === "single" && single.notes) ev.notes = single.notes;
+        return { ...d, type: guess, guess, ev, fileIds: files.map((f) => f.id), vote: null, aspects: [], suggested: { projectId: d.projectId, dueDate: d.dueDate, steps: d.steps } };
+      }));
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
 
   async function save() {
-    if (!rows?.length) return;
+    if (!rows?.length || blocked) return;
     setBusy(true); setError("");
+    const taskRows = rows.filter((r) => r.type === "task");
+    const eventRows = rows.filter((r) => r.type === "event");
     try {
-      await api("/api/tasks", {
-        body: {
-          today, brief,
-          tasks: rows.map(({ vote, aspects, suggested, ...t }) => ({ ...t, feedback: { vote, aspects, suggested } })),
-        },
-      });
+      if (taskRows.length) {
+        await api("/api/tasks", {
+          body: {
+            today, brief,
+            tasks: taskRows.map(({ vote, aspects, suggested, type, guess, ev, ...t }) => ({ ...t, feedback: { vote, aspects, suggested } })),
+          },
+        });
+        // Saved: if the events step fails below, a retry must not add these tasks twice.
+        if (eventRows.length) setRows(eventRows);
+      }
+      if (eventRows.length) {
+        await api("/api/events", {
+          body: {
+            events: eventRows.map((r) => ({
+              title: r.title, kind: r.ev.kind, project_id: r.projectId, start_date: r.ev.start_date, end_date: r.ev.end_date || null,
+              start_time: r.ev.start_time, end_time: r.ev.end_time, location: r.ev.location, url: r.ev.url, notes: r.ev.notes, fileIds: r.fileIds,
+            })),
+          },
+        });
+      }
       onSaved();
     } catch (e) { setError((e as Error).message); setBusy(false); }
   }
 
+  const blankEvent = (title: string, date: string): EventDraft => ({ title, kind: "other", start_date: date, end_date: "", start_time: "", end_time: "", location: "", url: "", notes: "", dateFound: false, dateReason: "No date found. Please check the date" });
+  const updEv = (i: number, patch: Partial<EventDraft>) => setRows((d) => d!.map((x, j) => (j === i ? { ...x, ev: { ...x.ev, ...patch } } : x)));
+  // Flipping between task and event keeps the date you can see.
+  const setType = (i: number, type: EntryType) => setRows((d) => d!.map((x, j) => {
+    if (j !== i || x.type === type) return x;
+    if (type === "event") return { ...x, type, ev: x.ev.dateFound ? x.ev : { ...x.ev, start_date: x.dueDate } };
+    return { ...x, type, dueDate: x.ev.dateFound ? x.ev.start_date : x.dueDate, dueReason: x.ev.dateFound ? "From the event date" : x.dueReason };
+  }));
+  const eventIssue = (r: Row) => (r.type === "event" ? (!r.title.trim() ? "Give the event a name." : endTimeProblem(r.ev.start_time, r.ev.end_time, r.ev.end_date)) : "");
+  const blocked = rows?.some((r) => eventIssue(r)) ?? false;
   const upd = (i: number, patch: Partial<Row>) => setRows((d) => d!.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const vote = (i: number, v: "up" | "down") => {
     const r = rows![i];
@@ -142,9 +186,9 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
 
   return (
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-label="Add tasks">
+      <div className="modal" role="dialog" aria-label="Add tasks and events">
         <div className="row between" style={{ marginBottom: 6 }}>
-          <h2 style={{ fontSize: 22 }}>{rows ? `Review ${rows.length} task${rows.length === 1 ? "" : "s"}` : "Add tasks"}</h2>
+          <h2 style={{ fontSize: 22 }}>{rows ? `Review ${rows.length} entr${rows.length === 1 ? "y" : "ies"}` : "Add tasks & events"}</h2>
           <button className="icon-btn" onClick={onClose} aria-label="Close"><XIcon /></button>
         </div>
 
@@ -152,20 +196,20 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
           <>
             <div className="seg" style={{ display: "inline-flex", margin: "8px 0 14px" }} role="tablist">
               <button role="tab" aria-selected={mode === "batch"} className={mode === "batch" ? "on" : ""} onClick={() => switchMode("batch")}>Batch dump</button>
-              <button role="tab" aria-selected={mode === "single"} className={mode === "single" ? "on" : ""} onClick={() => switchMode("single")}>Single task</button>
+              <button role="tab" aria-selected={mode === "single"} className={mode === "single" ? "on" : ""} onClick={() => switchMode("single")}>Single entry</button>
             </div>
 
             {mode === "batch" ? (
               <>
                 <p className="muted" style={{ marginTop: 0 }}>
-                  One task per line. Paste a whole brain-dump and mention dates naturally (“by Friday”, “next week”, “20/12”); THEO works out the rest.
+                  One entry per line. Paste a whole brain-dump and mention dates naturally (“by Friday”, “next week”, “20/12”). THEO decides whether each is a <b>task</b> (something to do) or an <b>event</b> (something you attend), and you can flip it in the review.
                   Got something big like “build a business”? Use the <Link href="/plan" style={{ color: "var(--accent-dark)", fontWeight: 700 }}>Goal planner</Link>.
                 </p>
                 <textarea className="textarea" style={{ minHeight: 200 }} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={PLACEHOLDER} />
               </>
             ) : (
               <form className="stack" onSubmit={(e) => { e.preventDefault(); if (canAnalyze && !busy) analyze(); }}>
-                <p className="muted" style={{ margin: 0 }}>Describe the task. Leave the other fields on <b>Auto</b> and THEO fills them in, or set them yourself.</p>
+                <p className="muted" style={{ margin: 0 }}>Describe the task or event. Leave the other fields on <b>Auto</b> and THEO fills them in, or set them yourself.</p>
                 <input className="input" style={{ padding: 14, fontSize: 16 }} autoFocus placeholder="e.g. Call the plumber about the leak by Thursday"
                   value={single.title} onChange={(e) => setSingle({ ...single, title: e.target.value })} />
                 <div className="form-row stack-mobile">
@@ -218,7 +262,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
             <div className="row between" style={{ marginTop: 16 }}>
               {mode === "batch" ? <button className="btn ghost" onClick={() => setText(EXAMPLE)}>Try an example</button> : <span />}
               <button className="btn primary" disabled={busy || !canAnalyze} onClick={analyze}>
-                <span className="row" style={{ gap: 6 }}><SparkIcon size={16} />{busy ? "Thinking…" : mode === "single" ? "Add task" : "Organize for me"}</span>
+                <span className="row" style={{ gap: 6 }}><SparkIcon size={16} />{busy ? "Thinking…" : mode === "single" ? "Add entry" : "Organize for me"}</span>
               </button>
             </div>
           </>
@@ -226,7 +270,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
           <>
             <div className="row between wrap" style={{ marginBottom: 12 }}>
               <p className="muted" style={{ margin: 0 }}>
-                Rate each suggestion with 👍 / 👎 (👎 asks what was off) and fix anything. THEO learns from both.
+                Check whether each entry is a <b>Task</b> or an <b>Event</b>, set its project tag and fix anything. On tasks, rate THEO&apos;s suggestion with 👍 / 👎 and it learns from both.
                 {brief && <><br /><span className="small">Using your brief: “{brief.length > 90 ? brief.slice(0, 90) + "…" : brief}”</span></>}
               </p>
               {rows.length > 1 && <button className="btn ghost small" onClick={allUp}>👍 All good</button>}
@@ -239,7 +283,62 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
             )}
             <div className="stack">
               {rows.map((d, i) => (
-                <div key={i} className={`draft ${d.vote ? "voted-" + d.vote : ""}`}>
+                <div key={i} className="entry">
+                  <div className="row between" style={{ marginBottom: 6 }}>
+                    <div className="seg" role="radiogroup" aria-label="Entry type">
+                      <button type="button" role="radio" aria-checked={d.type === "task"} className={d.type === "task" ? "on" : ""} onClick={() => setType(i, "task")}>Task</button>
+                      <button type="button" role="radio" aria-checked={d.type === "event"} className={d.type === "event" ? "on" : ""} onClick={() => setType(i, "event")}>Event</button>
+                    </div>
+                    <span className="muted small">{d.type === d.guess ? `THEO's guess: ${d.guess}` : "You changed this"}</span>
+                  </div>
+                  {d.type === "event" ? (
+                    <div className="ev-draft" style={{ borderLeftColor: kindOf(d.ev.kind).accent }}>
+                      <div className="row" style={{ alignItems: "flex-start" }}>
+                        <input className="input grow" style={{ fontWeight: 700 }} value={d.title} aria-label="Event name" onChange={(e) => upd(i, { title: e.target.value })} />
+                        <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove"><XIcon size={16} /></button>
+                      </div>
+                      <div className="ev-fields two">
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">Project tag</span>
+                          <ProjectSelect projects={projects} value={d.projectId} onCreated={addProject}
+                            onChange={(id) => upd(i, { projectId: id, projectName: projects.find((p) => p.id === id)?.name ?? null })} />
+                        </label>
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">Type</span>
+                          <select className="select" value={d.ev.kind} onChange={(e) => updEv(i, { kind: e.target.value })}>
+                            {EVENT_KINDS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      <div className="ev-fields" style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">Date</span>
+                          <input type="date" className="input" value={d.ev.start_date} onChange={(e) => updEv(i, { start_date: e.target.value, dateFound: true, dateReason: "You picked it" })} />
+                        </label>
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">End date</span>
+                          <input type="date" className="input" min={d.ev.start_date} value={d.ev.end_date} onChange={(e) => updEv(i, { end_date: e.target.value })} />
+                        </label>
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">Start time</span>
+                          <input type="time" className="input" value={d.ev.start_time} onChange={(e) => updEv(i, { start_time: e.target.value })} />
+                        </label>
+                        <label className="stack" style={{ gap: 4 }}>
+                          <span className="small muted">End time</span>
+                          <input type="time" className="input" value={d.ev.end_time} onChange={(e) => updEv(i, { end_time: e.target.value })} />
+                        </label>
+                      </div>
+                      <div className={`why${d.ev.dateFound ? "" : " warn"}`}>{d.ev.dateReason}</div>
+                      <div className="ev-fields two">
+                        <input className="input" placeholder="Location" value={d.ev.location} onChange={(e) => updEv(i, { location: e.target.value })} aria-label="Location" />
+                        <input className="input" placeholder="Link (optional)" inputMode="url" autoCapitalize="none" value={d.ev.url} onChange={(e) => updEv(i, { url: e.target.value })} aria-label="Link" />
+                      </div>
+                      <textarea className="textarea" style={{ minHeight: 56, marginTop: 8 }} placeholder="Description (optional)" value={d.ev.notes}
+                        onChange={(e) => updEv(i, { notes: e.target.value })} aria-label="Description" />
+                      {eventIssue(d) && <div className="err" style={{ marginTop: 8 }} role="alert">{eventIssue(d)}</div>}
+                    </div>
+                  ) : (
+                <div className={`draft ${d.vote ? "voted-" + d.vote : ""}`}>
                   <div>
                     <input className="input" value={d.title} onChange={(e) => upd(i, { title: e.target.value })} />
                     <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
@@ -293,12 +392,14 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                   </div>
                   <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove"><XIcon size={16} /></button>
                 </div>
+                  )}
+                </div>
               ))}
             </div>
             {error && <div className="err" style={{ marginTop: 12 }}>{error}</div>}
             <div className="row between" style={{ marginTop: 18 }}>
               <button className="btn ghost" onClick={() => setRows(null)}>← Back</button>
-              <button className="btn primary" disabled={busy || !rows.length} onClick={save}>{busy ? "Saving…" : `Save ${rows.length} task${rows.length === 1 ? "" : "s"}`}</button>
+              <button className="btn primary" disabled={busy || !rows.length || blocked} onClick={save}>{busy ? "Saving…" : `Save ${rows.length} entr${rows.length === 1 ? "y" : "ies"}`}</button>
             </div>
           </>
         )}

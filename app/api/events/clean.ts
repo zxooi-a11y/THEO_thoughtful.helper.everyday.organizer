@@ -21,5 +21,6 @@ export function cleanEvent(b: Record<string, unknown>): EventInput {
   }
   if ("notes" in b) e.notes = str(b.notes, 5000);
   if ("favorite" in b) e.favorite = !!b.favorite;
+  if ("project_id" in b) e.project_id = Number(b.project_id) > 0 ? Number(b.project_id) : null;
   return e;
 }

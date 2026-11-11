@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS events (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS events_start_idx ON events (start_date);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id) ON DELETE SET NULL;  -- the project tag it sits under
+CREATE INDEX IF NOT EXISTS events_project_idx ON events (project_id);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time TEXT NOT NULL DEFAULT '';   -- optional "16:30"
 
 -- Files attached to tasks. Stored in the database itself (no extra service / cost).

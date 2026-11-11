@@ -412,3 +412,7 @@ a.final-link:hover { border-color: var(--accent); }
   .ev-fields { grid-template-columns: 1fr 1fr; }
 }
 .ev-desc { margin: -4px 0 0; font-size: 13px; line-height: 1.5; color: #6e6a63; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.entry + .entry { margin-top: 2px; }
+.entry .seg button { padding: 5px 14px; }
+.ev-proj { display: inline-block; padding: 3px 9px; border-radius: 7px; font-weight: 700; font-size: 12px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-self: center; }
+select.pill { appearance: auto; }

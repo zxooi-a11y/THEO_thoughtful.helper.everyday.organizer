@@ -1,6 +1,6 @@
 // Shapes shared between API routes and the UI.
 
-export type Project = { id: number; name: string; color: string; open_count?: number; done_count?: number };
+export type Project = { id: number; name: string; color: string; open_count?: number; done_count?: number; event_count?: number };
 
 export type FileMeta = { id: number; name: string; mime: string; size: number; readable: boolean };
 

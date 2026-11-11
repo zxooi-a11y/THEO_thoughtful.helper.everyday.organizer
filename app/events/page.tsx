@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from "@/lib/events";
 import type { EventHints } from "@/lib/brain";
-import type { FileMeta } from "@/lib/types";
+import type { FileMeta, Project } from "@/lib/types";
+import ProjectSelect from "@/components/ProjectSelect";
 import EventCard from "@/components/EventCard";
 import { api, fmtDate, localToday } from "@/components/client";
 import { FileDrop, FileList, uploadFile } from "@/components/files";
@@ -14,13 +15,15 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
 };
 
-type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; end_time: string; location: string; url: string; notes: string; favorite: boolean; files: FileMeta[] };
+type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; end_time: string; location: string; url: string; notes: string; favorite: boolean; project_id: number | null; files: FileMeta[] };
 
-const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", end_time: "", location: "", url: "", notes: "", favorite: false, files: [] });
+const blank = (today: string): Draft => ({ title: "", kind: "other", autoKind: true, start_date: today, end_date: "", start_time: "", end_time: "", location: "", url: "", notes: "", favorite: false, project_id: null, files: [] });
 
 export default function EventsPage() {
   const [today, setToday] = useState("");
   const [events, setEvents] = useState<LifeEvent[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectFilter, setProjectFilter] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [showPast, setShowPast] = useState(false);
   const [batch, setBatch] = useState<{ seed: string } | null>(null);
@@ -32,7 +35,8 @@ export default function EventsPage() {
   const [hints, setHints] = useState<EventHints | null>(null);
   const [error, setError] = useState("");
 
-  const load = useCallback(() => api<LifeEvent[]>("/api/events").then(setEvents).catch((e) => setError(e.message)), []);
+  const load = useCallback(() => Promise.all([api<LifeEvent[]>("/api/events"), api<Project[]>("/api/projects")])
+    .then(([ev, pr]) => { setEvents(ev); setProjects(pr); }).catch((e) => setError(e.message)), []);
   useEffect(() => {
     const t = localToday();
     setToday(t); load();
@@ -116,9 +120,17 @@ export default function EventsPage() {
     setHints(null);
   }
 
+  async function convertToTask() {
+    if (!draft?.id || !confirm(`Turn “${draft.title}” into a task? Its date becomes the due date; the place, time and link move into the task's notes. It keeps its project tag and files.`)) return;
+    try {
+      await api("/api/convert", { body: { from: "event", id: draft.id, today } });
+      setDraft(null); setNotice("Converted to a task. Find it on the Task calendar."); load();
+    } catch (e) { setError((e as Error).message); }
+  }
+
   function openEdit(e: LifeEvent) {
     setError("");
-    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, end_time: e.end_time ?? "", location: e.location, url: e.url, notes: e.notes, favorite: e.favorite, files: e.files ?? [] });
+    setDraft({ id: e.id, title: e.title, kind: e.kind, autoKind: false, start_date: e.start_date, end_date: e.end_date ?? "", start_time: e.start_time, end_time: e.end_time ?? "", location: e.location, url: e.url, notes: e.notes, favorite: e.favorite, project_id: e.project_id ?? null, files: e.files ?? [] });
   }
 
   async function save() {
@@ -144,7 +156,8 @@ export default function EventsPage() {
     await api(`/api/events/${e.id}`, { method: "PATCH", body: { favorite: !e.favorite } }).catch((er) => setError(er.message));
   }
 
-  const shown = useMemo(() => [...events].sort((a, b) => (a.start_date + a.start_time).localeCompare(b.start_date + b.start_time)).filter((e) => filter === "all" || (filter === "fav" ? e.favorite : e.kind === filter)), [events, filter]);
+  const projectOf = (e: LifeEvent) => projects.find((p) => p.id === e.project_id) ?? null;
+  const shown = useMemo(() => [...events].sort((a, b) => (a.start_date + a.start_time).localeCompare(b.start_date + b.start_time)).filter((e) => (filter === "all" || (filter === "fav" ? e.favorite : e.kind === filter)) && (!projectFilter || (projectFilter === "none" ? e.project_id == null : String(e.project_id) === projectFilter))), [events, filter, projectFilter]);
   const upcoming = shown.filter((e) => (e.end_date ?? e.start_date) >= today);
   const past = shown.filter((e) => (e.end_date ?? e.start_date) < today).reverse();
   const kindsUsed = EVENT_KINDS.filter((k) => events.some((e) => e.kind === k.key));
@@ -165,6 +178,13 @@ export default function EventsPage() {
         <div className="row wrap" style={{ gap: 8, marginBottom: 22 }}>
           <button className={`pill ${filter === "all" ? "on-dark" : ""}`} onClick={() => setFilter("all")}>All</button>
           <button className={`pill ${filter === "fav" ? "on-dark" : ""}`} onClick={() => setFilter("fav")}>♥ Favourites</button>
+          {projects.length > 0 && (
+            <select className="pill" style={{ paddingRight: 8 }} value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filter by project tag">
+              <option value="">All projects</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="none">No project</option>
+            </select>
+          )}
           {kindsUsed.map((k) => (
             <button key={k.key} className="pill" onClick={() => setFilter(k.key)}
               style={filter === k.key ? { background: k.pill, color: k.accent, borderColor: k.pill } : undefined}>{k.label}</button>
@@ -182,7 +202,7 @@ export default function EventsPage() {
         </div>
       ) : (
         <div className="event-grid">
-          {upcoming.map((e) => <EventCard key={e.id} event={e} today={today} onFavorite={() => toggleFav(e)} onOpen={() => openEdit(e)} />)}
+          {upcoming.map((e) => <EventCard key={e.id} event={e} project={projectOf(e)} today={today} onFavorite={() => toggleFav(e)} onOpen={() => openEdit(e)} />)}
         </div>
       )}
 
@@ -191,14 +211,14 @@ export default function EventsPage() {
           <button className="btn ghost" onClick={() => setShowPast(!showPast)}>{showPast ? "Hide" : "Show"} past events ({past.length})</button>
           {showPast && (
             <div className="event-grid" style={{ marginTop: 14 }}>
-              {past.map((e) => <EventCard key={e.id} event={e} today={today} onFavorite={() => toggleFav(e)} onOpen={() => openEdit(e)} />)}
+              {past.map((e) => <EventCard key={e.id} event={e} project={projectOf(e)} today={today} onFavorite={() => toggleFav(e)} onOpen={() => openEdit(e)} />)}
             </div>
           )}
         </div>
       )}
 
       {batch && (
-        <EventBatchAdd today={today} seed={batch.seed}
+        <EventBatchAdd today={today} projects={projects} seed={batch.seed}
           onClose={() => setBatch(null)} onSingle={toSingle}
           onSaved={(n) => { setBatch(null); setNotice(`Added ${n} event${n === 1 ? "" : "s"}.`); load(); }} />
       )}
@@ -233,6 +253,12 @@ export default function EventsPage() {
                 ))}
               </div>
             </div>
+
+            <label className="stack" style={{ gap: 6 }}>
+              <span className="small" style={{ fontWeight: 700 }}>Project tag <span className="muted">· groups it with related tasks</span></span>
+              <ProjectSelect projects={projects} value={draft.project_id} emptyLabel="No project" onChange={(id) => upd({ project_id: id })}
+                onCreated={(p) => setProjects((ps) => (ps.some((x) => x.id === p.id) ? ps : [...ps, p]))} />
+            </label>
 
             <div className="form-row">
               <label className="stack" style={{ gap: 6 }}>
@@ -305,6 +331,7 @@ export default function EventsPage() {
             <div className="row between wrap">
               <div className="row">
                 {draft.id && <button type="button" className="btn danger" onClick={remove}>Delete</button>}
+                {draft.id && <button type="button" className="btn ghost" onClick={convertToTask} title="Turn this event into a task with a due date">Convert to task</button>}
                 {draft.title && (
                   <a className="btn ghost" href={`/plan?goal=${encodeURIComponent(`Prepare for ${draft.title}`)}`} title="Turn this event into a step-by-step prep plan">Plan prep tasks →</a>
                 )}
