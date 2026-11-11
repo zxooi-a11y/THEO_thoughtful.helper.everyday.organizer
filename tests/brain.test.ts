@@ -197,3 +197,46 @@ test("event end times: ranges are read, formatted and validated", async () => {
   assert.equal(endTimeProblem("22:00", "02:00", "2026-12-13"), "");   // overnight with an end date is fine
   assert.equal(endTimeProblem("", "02:00", null), "");               // only one time given
 });
+
+test("batch events: lines become full event drafts", async () => {
+  const { analyzeEvent, analyzeEvents } = await import("../lib/brain/index.ts");
+  const e = (line: string) => analyzeEvent(line, TODAY);   // TODAY = Mon 2026-11-09
+
+  const wed = e("Sarah & Tom's wedding 12 Dec 2026 4pm at Kuala Lumpur");
+  assert.deepEqual([wed.title, wed.kind, wed.start_date, wed.start_time, wed.location], ["Sarah & Tom's wedding", "wedding", "2026-12-12", "16:00", "Kuala Lumpur"]);
+
+  const bali = e("Bali holiday 20-27 Dec");
+  assert.deepEqual([bali.title, bali.kind, bali.start_date, bali.end_date], ["Bali holiday", "holiday", "2026-12-20", "2026-12-27"]);
+
+  const iv = e("Google interview tomorrow 10am");
+  assert.deepEqual([iv.title, iv.kind, iv.start_date, iv.start_time, iv.end_time], ["Google interview", "interview", "2026-11-10", "10:00", ""]);
+
+  const bday = e("Mum's 60th birthday party next Saturday 6-9pm");
+  assert.deepEqual([bday.kind, bday.start_date, bday.start_time, bday.end_time], ["birthday", "2026-11-21", "18:00", "21:00"]);
+
+  assert.equal(e("Conference Dec 28 - Jan 3").end_date, "2027-01-03");
+  assert.equal(e("Dec 20-27 Bali holiday").start_date, "2026-12-20");
+  assert.equal(e("Team offsite 2026-12-03 to 2026-12-05").end_date, "2026-12-05");
+  assert.equal(e("Trip 20 Dec - 27 Dec 2026").end_date, "2026-12-27");
+
+  const night = e("New Year party 31 Dec 10pm - 2am");
+  assert.deepEqual([night.start_time, night.end_time, night.end_date], ["22:00", "02:00", "2027-01-01"]); // past midnight → next day
+
+  const aws = e("AWS Summit https://aws.amazon.com/summit 24/11");
+  assert.deepEqual([aws.title, aws.kind, aws.start_date, aws.url], ["AWS Summit", "conference", "2026-11-24", "https://aws.amazon.com/summit"]);
+
+  // Keeps a meaningful title when the place is all there is
+  const g = e("Interview at Google 3 Dec 10:30");
+  assert.deepEqual([g.title, g.location, g.start_time], ["Interview at Google", "Google", "10:30"]);
+
+  // No date → a flagged default (or the day that was clicked)
+  const none = e("Dentist");
+  assert.equal(none.dateFound, false);
+  assert.equal(none.start_date, TODAY);
+  assert.equal(analyzeEvent("Dentist", TODAY, "2026-11-20").start_date, "2026-11-20");
+
+  // Bulk: bullets, numbers and blank lines
+  const many = analyzeEvents("- Bali holiday 20-27 Dec\n2) Mum's birthday 18 Nov\n\n[ ] Google interview 10 Nov 9am", TODAY);
+  assert.equal(many.length, 3);
+  assert.deepEqual(many.map((d) => d.kind), ["holiday", "birthday", "interview"]);
+});

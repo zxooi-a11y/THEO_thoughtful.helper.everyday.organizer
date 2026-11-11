@@ -5,6 +5,9 @@ import { classify, type LearnedKeywords, type ProjectRef } from "./classify.ts";
 import { addDays, parseDue } from "./dates.ts";
 import { suggestSteps, type LearnedPlan } from "./steps.ts";
 import { tidyTitle } from "./text.ts";
+export { splitBulk } from "./text.ts";
+export { analyzeEvent, analyzeEvents } from "./events.ts";
+export type { EventDraft } from "./events.ts";
 import type { FileContext } from "./files.ts";
 
 export { planGoal } from "./goals.ts";
@@ -40,14 +43,6 @@ export type TaskDraft = {
 const DEFAULT_LEAD: Record<string, number> = {
   Errands: 2, Home: 3, Work: 3, Finance: 5, Health: 7, Social: 7, Business: 7, Learning: 14,
 };
-
-/** Split a pasted blob into individual task lines (newlines, bullets, numbered lists, semicolons). */
-export function splitBulk(text: string): string[] {
-  return text
-    .split(/\r?\n|;(?=\s)/)
-    .map((l) => l.replace(/^\s*(?:[-*•▪◦·]|\d+[.)]|\[\s?[xX ]?\s?\])\s*/, "").trim())
-    .filter((l) => l.length > 1);
-}
 
 export type AnalyzeExtras = {
   /** What THEO learned from attached files (keywords, deadline, urgency, checklist). */

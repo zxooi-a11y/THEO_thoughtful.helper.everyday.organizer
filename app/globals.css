@@ -402,3 +402,12 @@ a.final-link:hover { border-color: var(--accent); }
 }
 
 .ev-range.ev-time { margin-top: -2px; color: var(--ev); font-weight: 700; }
+
+/* Batch events review */
+.ev-draft { background: var(--soft); border-radius: 12px; padding: 12px; border-left: 4px solid var(--muted-2); }
+.ev-fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.ev-fields.two { grid-template-columns: 1fr 1fr; }
+.why.warn { color: var(--danger); font-weight: 700; }
+@media (max-width: 860px) {
+  .ev-fields { grid-template-columns: 1fr 1fr; }
+}

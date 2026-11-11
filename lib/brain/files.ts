@@ -122,8 +122,8 @@ const hhmm = (h: number, m: number) => `${String(h).padStart(2, "0")}:${String(m
 const to24 = (h: number, ap: string) => (ap === "pm" && h < 12 ? h + 12 : ap === "am" && h === 12 ? 0 : h);
 
 /** Finds a start time (and end time, for ranges like "4–6 PM" or "16:00 to 18:30") near a position. */
-function findTimes(text: string, around: number): { start: string; end: string | null } | null {
-  const win = text.slice(Math.max(0, around - 40), around + 140);
+export function findTimes(text: string, around: number, before = 40, after = 140): { start: string; end: string | null; matched: string } | null {
+  const win = text.slice(Math.max(0, around - before), around + after);
 
   // Range with am/pm on the end (and optionally the start): "4 – 6 PM", "10am to 2pm", "4:30pm-6pm"
   const r = new RegExp(`\\b${T}\\s?(am|pm)?${SEP}${T}\\s?(am|pm)\\b`, "i").exec(win);
@@ -132,17 +132,17 @@ function findTimes(text: string, around: number): { start: string; end: string |
     const endH = to24(h2, ap2);
     let startH = to24(h1, ap1 || ap2);
     if (!ap1 && startH > endH) startH = to24(h1, ap2 === "pm" ? "am" : "pm"); // "11 – 1 PM" → 11am to 1pm
-    return { start: hhmm(startH, m1), end: hhmm(endH, m2) };
+    return { start: hhmm(startH, m1), end: hhmm(endH, m2), matched: r[0] };
   }
   // 24-hour range: "16:00 - 18:30"
   const r24 = /\b([01]?\d|2[0-3]):([0-5]\d)\s*(?:-|–|—|to|until|till)\s*([01]?\d|2[0-3]):([0-5]\d)\b/i.exec(win);
-  if (r24) return { start: hhmm(+r24[1], +r24[2]), end: hhmm(+r24[3], +r24[4]) };
+  if (r24) return { start: hhmm(+r24[1], +r24[2]), end: hhmm(+r24[3], +r24[4]), matched: r24[0] };
 
   // Single time
   const m = /\b(?:at\s+)?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)\b/i.exec(win);
-  if (m) return { start: hhmm(to24(+m[1], m[3].toLowerCase()), m[2] ? +m[2] : 0), end: null };
+  if (m) return { start: hhmm(to24(+m[1], m[3].toLowerCase()), m[2] ? +m[2] : 0), end: null, matched: m[0] };
   const m24 = /\b([01]?\d|2[0-3]):([0-5]\d)\b/.exec(win);
-  return m24 ? { start: hhmm(+m24[1], +m24[2]), end: null } : null;
+  return m24 ? { start: hhmm(+m24[1], +m24[2]), end: null, matched: m24[0] } : null;
 }
 
 export function buildEventHints(docs: FileDoc[], today: string): EventHints | null {

@@ -7,6 +7,12 @@ import EventCard from "@/components/EventCard";
 import { api, fmtDate, localToday } from "@/components/client";
 import { FileDrop, FileList, uploadFile } from "@/components/files";
 import { PlusIcon, XIcon } from "@/components/Icons";
+import EventBatchAdd from "@/components/EventBatchAdd";
+
+const store = {
+  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
+};
 
 type Draft = { id?: number; title: string; kind: string; autoKind: boolean; start_date: string; end_date: string; start_time: string; end_time: string; location: string; url: string; notes: string; favorite: boolean; files: FileMeta[] };
 
@@ -17,6 +23,8 @@ export default function EventsPage() {
   const [events, setEvents] = useState<LifeEvent[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [showPast, setShowPast] = useState(false);
+  const [batch, setBatch] = useState<{ seed: string } | null>(null);
+  const [notice, setNotice] = useState("");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -40,6 +48,23 @@ export default function EventsPage() {
 
   useEffect(() => { if (!draft) { setHints(null); setFileError(""); } }, [draft]);
   const closeDraft = () => { setDraft(null); load(); };
+
+  // "Add event" opens whichever way you used last (single form or batch dump).
+  function openAdd() {
+    setError(""); setNotice("");
+    if (store.get("theo:eventMode") === "batch") setBatch({ seed: "" });
+    else setDraft(blank(today));
+  }
+  function toBatch() {
+    store.set("theo:eventMode", "batch");
+    setBatch({ seed: draft?.title ?? "" });
+    setDraft(null);
+  }
+  function toSingle(firstLine: string) {
+    store.set("theo:eventMode", "single");
+    setBatch(null);
+    setDraft({ ...blank(today), title: firstLine, kind: firstLine ? detectKind(firstLine) : "other" });
+  }
 
   // Keep the most useful suggestion from each file: first type & link, earliest date (with its time).
   const mergeHints = (a: EventHints | null, b: EventHints | null | undefined): EventHints | null => {
@@ -130,7 +155,7 @@ export default function EventsPage() {
     <>
       <div className="page-head">
         <h1>Events</h1>
-        <button className="btn primary" onClick={() => { setError(""); setDraft(blank(today)); }}>
+        <button className="btn primary" onClick={openAdd}>
           <span className="row" style={{ gap: 6 }}><PlusIcon size={16} /> Add event</span>
         </button>
       </div>
@@ -148,6 +173,7 @@ export default function EventsPage() {
       )}
 
       {error && !draft && <div className="err" style={{ marginBottom: 20 }}>{error}</div>}
+      {notice && <div className="hint-banner" role="status" style={{ marginBottom: 20 }}>✓ {notice}</div>}
 
       <h2 style={{ marginBottom: 14 }}>Coming up</h2>
       {upcoming.length === 0 ? (
@@ -171,6 +197,12 @@ export default function EventsPage() {
         </div>
       )}
 
+      {batch && (
+        <EventBatchAdd today={today} seed={batch.seed}
+          onClose={() => setBatch(null)} onSingle={toSingle}
+          onSaved={(n) => { setBatch(null); setNotice(`Added ${n} event${n === 1 ? "" : "s"}.`); load(); }} />
+      )}
+
       {draft && (
         <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeDraft()}>
           <form className="modal stack" style={{ width: "min(640px, 100%)" }} onSubmit={(e) => { e.preventDefault(); save(); }}>
@@ -178,6 +210,13 @@ export default function EventsPage() {
               <h2 style={{ fontSize: 22 }}>{draft.id ? "Edit event" : "Add event"}</h2>
               <button type="button" className="icon-btn" onClick={closeDraft} aria-label="Close"><XIcon /></button>
             </div>
+
+            {!draft.id && (
+              <div className="seg" style={{ display: "inline-flex", alignSelf: "flex-start" }} role="tablist">
+                <button type="button" role="tab" aria-selected className="on">Single event</button>
+                <button type="button" role="tab" aria-selected={false} onClick={toBatch}>Batch dump</button>
+              </div>
+            )}
 
             <label className="stack" style={{ gap: 6 }}>
               <span className="small" style={{ fontWeight: 700 }}>What's happening?</span>

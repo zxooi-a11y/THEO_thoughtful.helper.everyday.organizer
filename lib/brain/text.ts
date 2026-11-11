@@ -67,3 +67,12 @@ export function tidyTitle(s: string): string {
       .trim(),
   );
 }
+
+/** Split a pasted blob into individual lines (newlines, bullets, numbered lists, semicolons). */
+export function splitBulk(text: string): string[] {
+  return text
+    .split(/\r?\n|;(?=\s)/)
+    .map((l) => l.replace(/^\s*(?:[-*•▪◦·]|\d+[.)]|\[\s?[xX ]?\s?\])\s*/, "").trim())
+    .filter((l) => l.length > 1);
+}
+
