@@ -4,6 +4,7 @@ import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from 
 import type { EventHints } from "@/lib/brain";
 import type { FileMeta, Project } from "@/lib/types";
 import ProjectSelect from "@/components/ProjectSelect";
+import ProjectColorRow from "@/components/ProjectColorRow";
 import EventCard from "@/components/EventCard";
 import { api, fmtDate, localToday } from "@/components/client";
 import { FileDrop, FileList, uploadFile } from "@/components/files";
@@ -249,6 +250,7 @@ export default function EventsPage() {
               <ProjectSelect projects={projects} value={draft.project_id} emptyLabel="No project" onChange={(id) => upd({ project_id: id })}
                 onCreated={(p) => setProjects((ps) => (ps.some((x) => x.id === p.id) ? ps : [...ps, p]))} />
             </label>
+            <ProjectColorRow project={projects.find((p) => p.id === draft.project_id)} onChanged={(np) => setProjects((ps) => ps.map((x) => (x.id === np.id ? { ...x, ...np } : x)))} />
 
             <div className="form-row">
               <label className="stack" style={{ gap: 6 }}>

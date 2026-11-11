@@ -279,3 +279,17 @@ test("entries are guessed as task or event", async () => {
   for (const l of ["Finance Lang Invest Fair 12 Dec", "Sarah & Tom's wedding", "Bali holiday 20-27 Dec", "Google interview", "AWS Summit 24/11",
     "Mum's 60th birthday party", "Hot Flow Yoga class", "Coffee with Jo 3pm"]) assert.equal(g(l), "event", l);
 });
+
+test("events wear their project's colour, otherwise their type colour", async () => {
+  const { eventTheme } = await import("../lib/events.ts");
+  const { PALETTE, colorOf } = await import("../lib/colors.ts");
+  const plain = eventTheme("wedding", null);
+  const tagged = eventTheme("wedding", { color: "green" });
+  assert.notDeepEqual(plain, tagged);
+  assert.equal(tagged.accent, colorOf("green").fg);
+  assert.ok(tagged.panel.startsWith(colorOf("green").dot));          // soft tint of the project's colour
+  assert.equal(tagged.label, "Wedding");                              // type label unchanged
+  assert.deepEqual(eventTheme("wedding", undefined), plain);
+  assert.ok(PALETTE.length >= 12 && !PALETTE.includes("gray"));
+  assert.notDeepEqual(eventTheme("party", { color: "red" }), eventTheme("party", { color: "cyan" }));
+});

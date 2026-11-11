@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { api } from "./client";
 import ProjectSelect from "./ProjectSelect";
+import ProjectColorRow from "./ProjectColorRow";
 import { FileDrop, FileList, uploadFile } from "./files";
 import { normalizeWebUrl } from "@/lib/links";
 import { PlusIcon, XIcon } from "./Icons";
@@ -121,6 +122,7 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
             </select>
           </label>
         </div>
+        <ProjectColorRow project={projects.find((p) => p.id === projectId)} onChanged={(np) => setProjects((ps) => ps.map((x) => (x.id === np.id ? { ...x, ...np } : x)))} />
 
         <div className="form-row">
           <label className="stack" style={{ gap: 6 }}>

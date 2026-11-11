@@ -1,6 +1,7 @@
 // Event types: label, colours for the card (soft panel + strong accent) and words that identify them.
 // Pure module, shared by the server and the browser.
 import type { FileMeta } from "./types.ts";
+import { projectTheme } from "./colors.ts";
 
 export type EventKind = {
   key: string;
@@ -69,4 +70,15 @@ export function timeRange(e: Pick<LifeEvent, "start_time" | "end_time">): string
 export function endTimeProblem(start_time: string, end_time: string, end_date: string | null | undefined): string {
   if (!start_time || !end_time || end_date) return "";
   return end_time > start_time ? "" : "The end time must be after the start time. For an event that runs past midnight, set an end date too.";
+}
+
+/**
+ * The colours an event is drawn in. An event under a project tag takes that project's colour,
+ * so the whole project looks alike on the cards and the calendar; otherwise its own type colour.
+ */
+export function eventTheme(kind: string | null | undefined, project?: { color: string } | null) {
+  const k = kindOf(kind);
+  if (!project) return { accent: k.accent, panel: k.panel, pill: k.pill, label: k.label };
+  const t = projectTheme(project.color);
+  return { accent: t.accent, panel: t.panel, pill: t.pill, label: k.label };
 }

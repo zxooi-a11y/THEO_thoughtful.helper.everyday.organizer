@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { EventDraft } from "@/lib/brain/events";
 import type { Project } from "@/lib/types";
 import ProjectSelect from "./ProjectSelect";
-import { endTimeProblem, kindOf } from "@/lib/events";
+import { endTimeProblem, eventTheme } from "@/lib/events";
 import { api } from "./client";
 import { SparkIcon, XIcon } from "./Icons";
 
@@ -96,7 +96,7 @@ export default function EventBatchAdd({ today, projects: initialProjects, seed =
             <p className="muted" style={{ marginTop: 0 }}>Check each event and fix anything that looks off, then save them all.</p>
             <div className="stack">
               {rows.map((r, i) => {
-                const k = kindOf(r.kind);
+                const k = eventTheme(r.kind, projects.find((x) => x.id === r.project_id));
                 const issue = problem(r);
                 return (
                   <div key={i} className="ev-draft" style={{ borderLeftColor: k.accent }}>

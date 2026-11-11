@@ -453,3 +453,13 @@ select.pill { appearance: auto; }
 .ev-fields.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 860px) { .ev-fields.four { grid-template-columns: 1fr 1fr; } }
 .combo-shield { position: fixed; inset: 0; z-index: 69; background: transparent; }
+
+/* New-project form inside the picker */
+.combo-form { display: flex; flex-direction: column; gap: 10px; padding: 6px 4px 4px; }
+.combo-form-title { font-weight: 800; font-size: 15px; }
+.combo-form-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: -4px; }
+.combo-name { border: 1px solid var(--line); background: var(--soft); border-radius: 12px; padding: 11px 12px; font-size: 14px; outline: none; width: 100%; }
+.combo-name:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: #fff; }
+.combo-form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+.combo-panel .swatches { gap: 8px; }
+.combo-panel .swatch { width: 26px; height: 26px; border-radius: 9px; }

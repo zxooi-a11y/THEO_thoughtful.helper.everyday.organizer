@@ -1,7 +1,6 @@
 "use client";
-import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
+import { eventTheme, timeRange, type LifeEvent } from "@/lib/events";
 import { daysBetween } from "@/lib/brain/dates";
-import { colorOf } from "@/lib/colors";
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const md = (iso: string) => { const [, m, d] = iso.split("-").map(Number); return `${SHORT[m - 1]} ${d}`; };
@@ -45,7 +44,7 @@ function countdown(e: LifeEvent, today: string) {
 type Props = { event: LifeEvent; project?: { name: string; color: string } | null; today: string; onFavorite: () => void; onOpen: () => void };
 
 export default function EventCard({ event: e, project, today, onFavorite, onOpen }: Props) {
-  const k = kindOf(e.kind);
+  const k = eventTheme(e.kind, project);
   const [, m, d] = e.start_date.split("-").map(Number);
   const past = (e.end_date ?? e.start_date) < today;
   const soon = countdown(e, today);
@@ -67,8 +66,8 @@ export default function EventCard({ event: e, project, today, onFavorite, onOpen
         </button>
         <h3 className="ev-title">{e.title}</h3>
         <div className="row wrap" style={{ gap: 8 }}>
-          <span className="ev-pill" style={{ background: k.pill, color: k.accent }}>{k.label}</span>
-          {project && <span className="ev-proj" style={{ background: colorOf(project.color).bg, color: colorOf(project.color).fg }} title="Project tag">{project.name}</span>}
+          {/* Under a project tag the project name is the label (the card already wears its colour); otherwise the event's type */}
+          <span className="ev-pill" style={{ background: k.pill, color: k.accent }} title={project ? "Project tag" : undefined}>{project ? project.name : k.label}</span>
           {soon && <span className="ev-soon">{soon}</span>}
         </div>
         {e.notes && <p className="ev-desc">{e.notes}</p>}

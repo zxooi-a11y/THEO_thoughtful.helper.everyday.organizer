@@ -1,24 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { COLOR_KEYS, colorOf } from "@/lib/colors";
+import { colorOf } from "@/lib/colors";
+import Swatches from "@/components/Swatches";
 import type { Project, Task } from "@/lib/types";
 import { api, fmtDate, localToday, relDue } from "@/components/client";
 import ProjectSelect from "@/components/ProjectSelect";
 import TaskEditor from "@/components/TaskEditor";
-import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
+import { eventTheme, timeRange, type LifeEvent } from "@/lib/events";
 import { PlusIcon } from "@/components/Icons";
-
-const PALETTE = COLOR_KEYS.filter((k) => k !== "gray");
-
-function Swatches({ value, onPick }: { value: string; onPick: (c: string) => void }) {
-  return (
-    <div className="swatches">
-      {PALETTE.map((k) => (
-        <button type="button" key={k} className={`swatch ${value === k ? "on" : ""}`} style={{ background: colorOf(k).dot }} onClick={() => onPick(k)} aria-label={k} title={k} />
-      ))}
-    </div>
-  );
-}
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -134,7 +123,7 @@ export default function ProjectsPage() {
                   <div key={`e${en.e.id}`} className="list-row">
                     <div className="grow">
                       <a href={`/events?open=${en.e.id}`} style={{ display: "block" }} title="Open event">
-                        <div className="row" style={{ gap: 6 }}><span className="tag" style={{ background: kindOf(en.e.kind).pill, color: kindOf(en.e.kind).accent }}>Event</span><span style={{ fontWeight: 600, fontSize: 13 }}>{en.e.title}</span></div>
+                        <div className="row" style={{ gap: 6 }}><span className="tag" style={{ background: eventTheme(en.e.kind, p).pill, color: eventTheme(en.e.kind, p).accent }}>Event</span><span style={{ fontWeight: 600, fontSize: 13 }}>{en.e.title}</span></div>
                         <div className="muted small">{fmtDate(en.e.start_date)}{timeRange(en.e) ? ` · ${timeRange(en.e)}` : ""}</div>
                       </a>
                     </div>

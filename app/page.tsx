@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
-import { kindOf, timeRange, type LifeEvent } from "@/lib/events";
+import { eventTheme, kindOf, timeRange, type LifeEvent } from "@/lib/events";
 import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
@@ -132,7 +132,7 @@ export default function CalendarPage() {
   const maxChips = view === "month" ? 2 : 99;
 
   const eventChip = (e: LifeEvent) => {
-    const k = kindOf(e.kind);
+    const k = { ...kindOf(e.kind), ...eventTheme(e.kind, projectById.get(e.project_id ?? -1)) };
     return (
       <a key={`e${e.id}`} href={`/events?open=${e.id}`} className="chip ev-chip" style={{ background: k.pill, color: k.accent }} title={`${k.label}: ${e.title}`}
         onClick={(x) => x.stopPropagation()}>★ {e.title}</a>
@@ -208,7 +208,7 @@ export default function CalendarPage() {
           {view === "day" ? (
             <div className="day-list">
               {(eventsByDay.get(cursor) ?? []).map((e) => {
-                const k = kindOf(e.kind);
+                const k = { ...kindOf(e.kind), ...eventTheme(e.kind, projectById.get(e.project_id ?? -1)) };
                 return (
                   <a key={e.id} href={`/events?open=${e.id}`} className="day-item" style={{ background: k.panel }}>
                     <span className="chip" style={{ background: k.pill, color: k.accent }}>★ {k.label}</span>

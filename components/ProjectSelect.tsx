@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { Project } from "@/lib/types";
-import { colorOf } from "@/lib/colors";
+import { colorOf, PALETTE } from "@/lib/colors";
+import Swatches from "./Swatches";
 import { api } from "./client";
 import { PlusIcon, SearchIcon } from "./Icons";
 
@@ -39,6 +40,12 @@ export default function ProjectSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  // "New project" mini form
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState(PALETTE[0]);
+  const [saving, setSaving] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxH: number } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -75,14 +82,14 @@ export default function ProjectSelect({
     const idx = value == null ? 0
       : extra.some((x) => x.value === value) ? 1 + extra.findIndex((x) => x.value === value)
       : 1 + extra.length + Math.max(0, projects.findIndex((p) => p.id === value));
-    setQuery(""); setActive(idx); place(); setOpen(true);
+    setQuery(""); setActive(idx); setCreating(false); place(); setOpen(true);
   };
   const close = useCallback((refocus = true) => { setOpen(false); if (refocus) trigger.current?.focus(); }, []);
 
   useLayoutEffect(() => { if (open) place(); }, [open, place]);
   useEffect(() => {
     if (!open) return;
-    search.current?.focus();
+    (creating ? nameInput.current : search.current)?.focus();
     const onMove = () => place();
     window.addEventListener("resize", onMove);
     window.addEventListener("scroll", onMove, true);
@@ -90,7 +97,7 @@ export default function ProjectSelect({
       window.removeEventListener("resize", onMove);
       window.removeEventListener("scroll", onMove, true);
     };
-  }, [open, place]);
+  }, [open, place, creating]);
 
   // Keep the highlighted row in range and in view
   useEffect(() => { if (active >= options.length) setActive(Math.max(0, options.length - 1)); }, [options.length, active]);
@@ -101,18 +108,30 @@ export default function ProjectSelect({
     close();
   }
 
+  // Step 1: open the form (name pre-filled from what was typed, next unused colour suggested)
+  function startCreate() {
+    const used = new Set(projects.map((p) => p.color));
+    setNewName(query.trim());
+    setNewColor(PALETTE.find((c) => !used.has(c)) ?? PALETTE[projects.length % PALETTE.length]);
+    setCreating(true);
+  }
+
+  // Step 2: save it
   async function create() {
-    const name = (query.trim() || window.prompt("Name your new project (e.g. Wedding, Side hustle, Kids):") || "").trim();
-    if (!name) return;
+    const name = newName.trim();
+    if (!name || saving) return;
     // Typed the name of one that exists? Just pick it.
     const same = projects.find((p) => p.name.toLowerCase() === name.toLowerCase());
-    if (same) { onChange(same.id); close(); return; }
+    if (same) { onChange(same.id); setCreating(false); close(); return; }
+    setSaving(true);
     try {
-      const p = await api<Project>("/api/projects", { body: { name } });
+      const p = await api<Project>("/api/projects", { body: { name, color: newColor } });
       onCreated?.(p);
       onChange(p.id);
+      setCreating(false);
       close();
     } catch (e) { alert((e as Error).message); }
+    finally { setSaving(false); }
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -121,7 +140,7 @@ export default function ProjectSelect({
     else if (e.key === "Enter") {
       e.preventDefault();
       if (options[active]) choose(options[active]);
-      else if (allowCreate) create();
+      else if (allowCreate) startCreate();
     } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
     else if (e.key === "Tab") close(false);
   }
@@ -147,6 +166,22 @@ export default function ProjectSelect({
           ref={panel} className="combo-panel" role="dialog" aria-label="Choose a project"
           style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxH }}
         >
+          {creating ? (
+            <div className="combo-form">
+              <div className="combo-form-title">New project</div>
+              <input
+                ref={nameInput} className="combo-name" value={newName} placeholder="Project name" aria-label="Project name" autoComplete="off"
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); create(); } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setCreating(false); } }}
+              />
+              <div className="combo-form-label">Colour</div>
+              <Swatches value={newColor} onPick={setNewColor} />
+              <div className="combo-form-actions">
+                <button type="button" className="btn small" onClick={() => setCreating(false)}>Back</button>
+                <button type="button" className="btn primary small" disabled={!newName.trim() || saving} onClick={create}>{saving ? "Creating…" : "Create project"}</button>
+              </div>
+            </div>
+          ) : (<>
           <div className="combo-search">
             <SearchIcon size={15} />
             <input
@@ -173,11 +208,12 @@ export default function ProjectSelect({
             })}
           </div>
           {allowCreate && (
-            <button type="button" className="combo-create" onMouseDown={(e) => e.preventDefault()} onClick={create}>
+            <button type="button" className="combo-create" onMouseDown={(e) => e.preventDefault()} onClick={startCreate}>
               <PlusIcon size={15} />
               <span>{query.trim() && !projects.some((p) => p.name.toLowerCase() === q) ? <>New project “<b>{query.trim()}</b>”</> : "New project…"}</span>
             </button>
           )}
+          </>)}
         </div>
         </>,
         document.body,

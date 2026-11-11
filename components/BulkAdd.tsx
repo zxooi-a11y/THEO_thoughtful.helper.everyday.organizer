@@ -5,7 +5,7 @@ import type { FileMeta, Project } from "@/lib/types";
 import type { TaskDraft } from "@/lib/brain";
 import type { EventDraft } from "@/lib/brain/events";
 import type { EntryType } from "@/lib/brain/entryType";
-import { endTimeProblem, kindOf } from "@/lib/events";
+import { endTimeProblem, eventTheme } from "@/lib/events";
 import { api, } from "./client";
 import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
@@ -292,7 +292,7 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                     <span className="muted small">{d.type === d.guess ? `THEO's guess: ${d.guess}` : "You changed this"}</span>
                   </div>
                   {d.type === "event" ? (
-                    <div className="ev-draft" style={{ borderLeftColor: kindOf(d.ev.kind).accent }}>
+                    <div className="ev-draft" style={{ borderLeftColor: eventTheme(d.ev.kind, projects.find((x) => x.id === d.projectId)).accent }}>
                       <div className="row" style={{ alignItems: "flex-start" }}>
                         <input className="input grow" style={{ fontWeight: 700 }} value={d.title} aria-label="Event name" onChange={(e) => upd(i, { title: e.target.value })} />
                         <button className="icon-btn" onClick={() => setRows(rows.filter((_, j) => j !== i))} aria-label="Remove"><XIcon size={16} /></button>
