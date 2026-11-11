@@ -2,6 +2,7 @@
 // Pure module, shared by the server and the browser.
 import type { FileMeta } from "./types.ts";
 import { projectTheme } from "./colors.ts";
+import { fmtTime } from "./time.ts";
 
 export type EventKind = {
   key: string;
@@ -55,11 +56,11 @@ export type LifeEvent = {
   files: FileMeta[];
 };
 
-/** "16:00 – 18:30", "16:00", "until 18:30" or "" (24h times as stored). */
+/** "4:00 PM – 6:30 PM", "4:00 PM", "until 6:30 PM" or "" (stored as 24h "HH:MM"). */
 export function timeRange(e: Pick<LifeEvent, "start_time" | "end_time">): string {
-  if (e.start_time && e.end_time) return `${e.start_time} – ${e.end_time}`;
-  if (e.start_time) return e.start_time;
-  if (e.end_time) return `until ${e.end_time}`;
+  if (e.start_time && e.end_time) return `${fmtTime(e.start_time)} – ${fmtTime(e.end_time)}`;
+  if (e.start_time) return fmtTime(e.start_time);
+  if (e.end_time) return `until ${fmtTime(e.end_time)}`;
   return "";
 }
 

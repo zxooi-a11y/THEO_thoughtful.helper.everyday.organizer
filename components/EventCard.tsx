@@ -1,6 +1,7 @@
 "use client";
 import { eventTheme, timeRange, type LifeEvent } from "@/lib/events";
 import { daysBetween } from "@/lib/brain/dates";
+import { fmtTime } from "@/lib/time";
 
 const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const md = (iso: string) => { const [, m, d] = iso.split("-").map(Number); return `${SHORT[m - 1]} ${d}`; };
@@ -49,7 +50,7 @@ export default function EventCard({ event: e, project, today, onFavorite, onOpen
   const past = (e.end_date ?? e.start_date) < today;
   const soon = countdown(e, today);
   // Single day: "16:00 – 18:30". Several days: the start time belongs to the first day, the end time to the last.
-  const times = (e.end_date ? [e.start_time && `Starts ${e.start_time}`, e.end_time && `Ends ${e.end_time}`] : [timeRange(e)]).filter(Boolean) as string[];
+  const times = (e.end_date ? [e.start_time && `Starts ${fmtTime(e.start_time)}`, e.end_time && `Ends ${fmtTime(e.end_time)}`] : [timeRange(e)]).filter(Boolean) as string[];
 
   return (
     <article className={`event-card${past ? " past" : ""}`} onClick={onOpen} style={{ ["--ev" as string]: k.accent }}>

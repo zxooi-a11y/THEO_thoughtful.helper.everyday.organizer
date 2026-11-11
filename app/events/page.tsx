@@ -4,7 +4,9 @@ import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from 
 import type { EventHints } from "@/lib/brain";
 import type { FileMeta, Project } from "@/lib/types";
 import ProjectSelect from "@/components/ProjectSelect";
+import { fmtTime } from "@/lib/time";
 import DateField from "@/components/DateField";
+import TimeField from "@/components/TimeField";
 import ProjectColorRow from "@/components/ProjectColorRow";
 import EventCard from "@/components/EventCard";
 import { api, fmtDate, localToday } from "@/components/client";
@@ -266,15 +268,15 @@ export default function EventsPage() {
 
             <div className="form-row">
               <label className="stack" style={{ gap: 6 }}>
-                <span className="small" style={{ fontWeight: 700 }}>Start time</span>
-                <input type="time" className="input" value={draft.start_time} onChange={(e) => upd({ start_time: e.target.value })} />
+                <span className="row" style={{ minHeight: 22 }}><span className="small" style={{ fontWeight: 700 }}>Start time</span></span>
+                <TimeField placeholder="All day" value={draft.start_time} onChange={(v) => upd({ start_time: v })} />
               </label>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="row between" style={{ minHeight: 22 }}>
                   <span className="small" style={{ fontWeight: 700 }}>End time</span>
                   {(draft.start_time || draft.end_time) && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => upd({ start_time: "", end_time: "" })}>All day</button>}
                 </span>
-                <input type="time" className="input" value={draft.end_time} onChange={(e) => upd({ end_time: e.target.value })} />
+                <TimeField placeholder="Not set" value={draft.end_time} onChange={(v) => upd({ end_time: v })} />
               </label>
             </div>
             {timeIssue && <div className="err" role="alert">{timeIssue}</div>}
@@ -308,7 +310,7 @@ export default function EventsPage() {
                   <b>THEO found in your file:</b>
                   <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
                     {hints.kind && <li>Type: <b>{kindOf(hints.kind).label}</b></li>}
-                    {hints.date && <li>Date: <b>{fmtDate(hints.date.value, true)}</b>{hints.time ? <> at <b>{hints.time}{hints.endTime ? ` – ${hints.endTime}` : ""}</b></> : null} <span className="muted">({hints.date.file})</span></li>}
+                    {hints.date && <li>Date: <b>{fmtDate(hints.date.value, true)}</b>{hints.time ? <> at <b>{fmtTime(hints.time)}{hints.endTime ? ` – ${fmtTime(hints.endTime)}` : ""}</b></> : null} <span className="muted">({hints.date.file})</span></li>}
                     {hints.url && <li style={{ wordBreak: "break-all" }}>Link: {hints.url}{draft.url ? <span className="muted"> (you already have one, so it won&apos;t be replaced)</span> : null}</li>}
                   </ul>
                   <div className="row" style={{ justifyContent: "flex-end" }}>

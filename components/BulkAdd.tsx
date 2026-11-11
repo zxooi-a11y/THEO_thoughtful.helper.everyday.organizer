@@ -10,6 +10,7 @@ import { api, } from "./client";
 import { FileDrop, FileList, uploadFile } from "./files";
 import ProjectSelect from "./ProjectSelect";
 import DateField from "./DateField";
+import TimeField from "./TimeField";
 import { SparkIcon, XIcon } from "./Icons";
 
 const PLACEHOLDER = "Type or paste your tasks and events here, one per line…";
@@ -316,11 +317,11 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
                         </label>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">Start time</span>
-                          <input type="time" className="input" value={d.ev.start_time} onChange={(e) => updEv(i, { start_time: e.target.value })} />
+                          <TimeField placeholder="All day" value={d.ev.start_time} onChange={(v) => updEv(i, { start_time: v })} />
                         </label>
                         <label className="stack" style={{ gap: 4 }}>
                           <span className="small muted">End time</span>
-                          <input type="time" className="input" value={d.ev.end_time} onChange={(e) => updEv(i, { end_time: e.target.value })} />
+                          <TimeField placeholder="Not set" value={d.ev.end_time} onChange={(v) => updEv(i, { end_time: v })} />
                         </label>
                       </div>
                       <div className={`why${d.ev.dateFound ? "" : " warn"}`}>{d.ev.dateReason}</div>

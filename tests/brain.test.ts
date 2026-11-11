@@ -187,9 +187,9 @@ test("event end times: ranges are read, formatted and validated", async () => {
     assert.equal(h.time, start, text);
     assert.equal(h.endTime, end, text);
   }
-  assert.equal(timeRange({ start_time: "16:00", end_time: "18:30" }), "16:00 – 18:30");
-  assert.equal(timeRange({ start_time: "16:00", end_time: "" }), "16:00");
-  assert.equal(timeRange({ start_time: "", end_time: "18:30" }), "until 18:30");
+  assert.equal(timeRange({ start_time: "16:00", end_time: "18:30" }), "4:00 PM – 6:30 PM");
+  assert.equal(timeRange({ start_time: "16:00", end_time: "" }), "4:00 PM");
+  assert.equal(timeRange({ start_time: "", end_time: "18:30" }), "until 6:30 PM");
   assert.equal(timeRange({ start_time: "", end_time: "" }), "");
   assert.equal(endTimeProblem("16:00", "18:30", null), "");
   assert.notEqual(endTimeProblem("16:00", "15:00", null), "");
@@ -316,4 +316,24 @@ test("custom project colours: validated, and always readable", async () => {
   }
   assert.ok(projectTheme("#3b82f6").panel.startsWith("#3b82f6"));    // event card side panel follows it
   assert.equal(colorOf("nonsense").dot, colorOf("gray").dot);         // unknown values still fall back safely
+});
+
+test("times: shown as 12-hour, typed in any common way", async () => {
+  const { fmtTime, parseTimeInput, splitTime, joinTime } = await import("../lib/time.ts");
+  assert.equal(fmtTime("16:30"), "4:30 PM");
+  assert.equal(fmtTime("00:05"), "12:05 AM");
+  assert.equal(fmtTime("12:00"), "12:00 PM");
+  assert.equal(fmtTime("09:00"), "9:00 AM");
+  assert.equal(fmtTime(""), "");
+  assert.deepEqual(splitTime("23:59"), { h24: 23, h12: 11, m: 59, ap: "PM" });
+  assert.equal(joinTime(12, 0, "AM"), "00:00");
+  assert.equal(joinTime(12, 0, "PM"), "12:00");
+  assert.equal(joinTime(4, 5, "PM"), "16:05");
+  const ok: [string, string | undefined, string][] = [
+    ["4pm", undefined, "16:00"], ["4:30 pm", undefined, "16:30"], ["4.30p.m.", undefined, "16:30"], ["16:30", undefined, "16:30"], ["1630", undefined, "16:30"],
+    ["430", "PM", "16:30"], ["430", "AM", "04:30"], ["12am", undefined, "00:00"], ["12pm", undefined, "12:00"], ["12:15am", undefined, "00:15"],
+    ["noon", undefined, "12:00"], ["midnight", undefined, "00:00"], ["7", undefined, "07:00"], ["7", "PM", "19:00"], ["19", "AM", "19:00"], ["08:05", "PM", "08:05"],
+  ];
+  for (const [input, fb, want] of ok) assert.equal(parseTimeInput(input, fb as "AM" | "PM" | undefined), want, `${input} (${fb})`);
+  for (const bad of ["", "25:00", "4:75", "13pm", "0pm", "abc", "4:3", "99"]) assert.equal(parseTimeInput(bad), null, bad);
 });

@@ -4,6 +4,7 @@ import type { EventDraft } from "@/lib/brain/events";
 import type { Project } from "@/lib/types";
 import ProjectSelect from "./ProjectSelect";
 import DateField from "./DateField";
+import TimeField from "./TimeField";
 import { endTimeProblem, eventTheme } from "@/lib/events";
 import { api } from "./client";
 import { SparkIcon, XIcon } from "./Icons";
@@ -123,11 +124,11 @@ export default function EventBatchAdd({ today, projects: initialProjects, seed =
                       </label>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">Start time</span>
-                        <input type="time" className="input" value={r.start_time} onChange={(e) => upd(i, { start_time: e.target.value })} />
+                        <TimeField placeholder="All day" value={r.start_time} onChange={(v) => upd(i, { start_time: v })} />
                       </label>
                       <label className="stack" style={{ gap: 4 }}>
                         <span className="small muted">End time</span>
-                        <input type="time" className="input" value={r.end_time} onChange={(e) => upd(i, { end_time: e.target.value })} />
+                        <TimeField placeholder="Not set" value={r.end_time} onChange={(v) => upd(i, { end_time: v })} />
                       </label>
                     </div>
                     <div className={`why${r.dateFound ? "" : " warn"}`}>{r.dateReason}</div>
