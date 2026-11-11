@@ -293,3 +293,27 @@ test("events wear their project's colour, otherwise their type colour", async ()
   assert.ok(PALETTE.length >= 12 && !PALETTE.includes("gray"));
   assert.notDeepEqual(eventTheme("party", { color: "red" }), eventTheme("party", { color: "cyan" }));
 });
+
+test("custom project colours: validated, and always readable", async () => {
+  const { normalizeColor, colorOf, projectTheme, isHexColor } = await import("../lib/colors.ts");
+  // What may be stored
+  assert.equal(normalizeColor("green"), "green");
+  assert.equal(normalizeColor(" #3B82F6 "), "#3b82f6");
+  for (const bad of ["gray", "javascript:alert(1)", "#fff", "#12345g", "red; background:url(x)", "", null, 42, "rgb(1,2,3)", "#3b82f6aa"]) assert.equal(normalizeColor(bad), null, String(bad));
+  assert.equal(isHexColor("#3b82f6"), true);
+
+  // A custom colour produces a full set: itself, a soft tint and a darker text colour
+  const c = colorOf("#3b82f6");
+  assert.equal(c.dot, "#3b82f6");
+  assert.notEqual(c.bg, c.dot);
+  const lum = (hex: string) => { const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(parseInt(hex.slice(1, 3), 16)) + 0.7152 * f(parseInt(hex.slice(3, 5), 16)) + 0.0722 * f(parseInt(hex.slice(5, 7), 16)); };
+  const ratio = (a: string, b: string) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  // Text on the tint must stay readable for any colour, including very light and very dark ones
+  for (const hex of ["#3b82f6", "#ffeb3b", "#ffffff", "#000000", "#ff00ff", "#84cc16", "#f0a04b", "#111827"]) {
+    const t = colorOf(hex);
+    assert.ok(ratio(t.fg, t.bg) >= 4.5, `${hex}: text ${t.fg} on ${t.bg} = ${ratio(t.fg, t.bg).toFixed(1)}`);
+  }
+  assert.ok(projectTheme("#3b82f6").panel.startsWith("#3b82f6"));    // event card side panel follows it
+  assert.equal(colorOf("nonsense").dot, colorOf("gray").dot);         // unknown values still fall back safely
+});

@@ -15,7 +15,40 @@ export const COLORS: Record<string, { bg: string; fg: string; dot: string }> = {
   gray:   { bg: "#EEEEEE", fg: "#555555", dot: "#A0A0A0" },
 };
 export const COLOR_KEYS = Object.keys(COLORS);
-export const colorOf = (key: string | undefined | null) => COLORS[key ?? ""] ?? COLORS.gray;
+
+const HEX = /^#[0-9a-f]{6}$/i;
+export const isHexColor = (v: unknown): v is string => typeof v === "string" && HEX.test(v);
+
+/** A palette name or a custom "#rrggbb" colour → what to store; null when it's neither. */
+export function normalizeColor(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (COLORS[t] && t !== "gray") return t;
+  return HEX.test(t) ? t.toLowerCase() : null;
+}
+
+const rgb = (hex: string): [number, number, number] => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+const toHex = (c: number[]) => "#" + c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
+/** t = 0 → a, t = 1 → b */
+const mix = (a: [number, number, number], b: [number, number, number], t: number) => a.map((x, i) => x + (b[i] - x) * t) as [number, number, number];
+const luminance = ([r, g, b]: [number, number, number]) => {
+  const f = (v: number) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+};
+
+/**
+ * Colours for a stored project colour: a palette name or a custom hex.
+ * For a custom colour, `dot` is the colour itself, `bg` a soft tint of it, and `fg` a darkened version
+ * (darker still for light colours) so text on the tint stays readable.
+ */
+export const colorOf = (key: string | undefined | null) => {
+  if (key && HEX.test(key)) {
+    const c = rgb(key);
+    const dark = luminance(c) > 0.5 ? 0.62 : 0.42;
+    return { dot: key.toLowerCase(), bg: toHex(mix(c, [255, 255, 255], 0.84)), fg: toHex(mix(c, [0, 0, 0], dark)) };
+  }
+  return COLORS[key ?? ""] ?? COLORS.gray;
+};
 
 /** The colours a person can choose for a project tag (gray is only the "no project" fallback). */
 export const PALETTE = COLOR_KEYS.filter((k) => k !== "gray");
