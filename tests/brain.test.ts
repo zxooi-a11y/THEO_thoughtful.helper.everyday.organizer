@@ -240,3 +240,31 @@ test("batch events: lines become full event drafts", async () => {
   assert.equal(many.length, 3);
   assert.deepEqual(many.map((d) => d.kind), ["holiday", "birthday", "interview"]);
 });
+
+test("batch events: long schedule lines split into title, place and description", async () => {
+  const { analyzeEvent } = await import("../lib/brain/index.ts");
+  const e = (line: string) => analyzeEvent(line, "2026-11-11");
+
+  const a = e("Bukit Jalil (Thursday, 26 November 2026): Megastrength Foundations runs with a capacity of 8, aimed at high-earning corporate professionals, 7:15 PM – 8:05 PM");
+  assert.equal(a.title, "Megastrength Foundations");
+  assert.equal(a.location, "Bukit Jalil");
+  assert.equal(a.start_date, "2026-11-26");
+  assert.deepEqual([a.start_time, a.end_time], ["19:15", "20:05"]);
+  assert.equal(a.kind, "class");
+  assert.equal(a.notes, "Runs with a capacity of 8, aimed at high-earning corporate professionals");
+
+  const b = e("Bandar Utama, One Square (Sunday, 29 November 2026): Hot Flow Slow (Yoga) runs with a capacity of 18, aimed at affluent urban professionals 11:00 AM – 12:00 PM");
+  assert.deepEqual([b.title, b.location, b.kind, b.start_time, b.end_time], ["Hot Flow Slow (Yoga)", "Bandar Utama, One Square", "class", "11:00", "12:00"]);
+
+  const c = e("Damansara Heights, The Five @ KPD (Friday, 11 December 2026): Reformer Foundations runs with a capacity of 14, aimed at high-end clients 8:30 AM – 9:20 AM");
+  assert.deepEqual([c.title, c.location, c.start_date, c.start_time], ["Reformer Foundations", "Damansara Heights, The Five @ KPD", "2026-12-11", "08:30"]);
+
+  // The explicit date beats the weekday label (no year given)
+  assert.equal(e("Petaling Jaya, Factory 19 (Monday, 30 November): Reformer Sculpt runs with a capacity of 12, aimed at career-driven professionals 6:00 PM – 6:50 PM").start_date, "2026-11-30");
+
+  // Ordinary short lines are untouched; a heading that isn't a place stays the title
+  const d = e("Dinner with Jo: bring wine 20 Nov 7pm");
+  assert.deepEqual([d.title, d.notes, d.location, d.start_date], ["Dinner with Jo", "Bring wine", "", "2026-11-20"]);
+  assert.equal(e("Sarah & Tom's wedding 12 Dec 2026 4pm at Kuala Lumpur").notes, "");
+  assert.equal(e("Kuala Lumpur: Sarah's wedding 12 Dec").location, "Kuala Lumpur");
+});

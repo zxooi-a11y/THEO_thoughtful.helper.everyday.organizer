@@ -81,6 +81,11 @@ function withYear(text: string): { date: string; matched: string; index: number;
   return null;
 }
 
+const EXPLICIT_DATE = new RegExp(
+  String.raw`\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\b` +
+  String.raw`|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})?\b|\b\d{4}-\d{1,2}-\d{1,2}\b`, "i");
+const WEEKDAYS = /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day|nesday|rsday|urday|sday)?\b,?/gi;
+
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const LOCATION = /\s+(?:at|in|@)\s+((?:[A-Z0-9][\w'’.&-]*)(?:\s+(?:[A-Z0-9][\w'’.&-]*|of|the|de|la|&))*)[\s.,;]*$/;
 const DANGLING = /(?:\s+|^)(?:on|at|from|by|for|until|till|to|@|-|–|—)\s*$/i;
@@ -92,6 +97,9 @@ export function analyzeEvent(line: string, today: string, defaultDate?: string |
   let url = "";
   const u = /https?:\/\/[^\s)<>"']+/i.exec(text);
   if (u) { url = u[0].replace(/[.,;:!?]+$/, ""); text = text.replace(u[0], " "); }
+
+  // "Thursday, 26 November": the weekday is just a label; the explicit date wins.
+  if (EXPLICIT_DATE.test(text)) text = text.replace(WEEKDAYS, " ");
 
   // Dates: a range ("20-27 Dec") or a single date ("12 Dec", "next Friday", "20/12")
   let start = "", end = "", dateFound = false, dateReason = "";
@@ -122,25 +130,71 @@ export function analyzeEvent(line: string, today: string, defaultDate?: string |
     dateReason += dateReason ? " · runs past midnight" : "";
   }
 
-  text = text.replace(/\s+/g, " ").trim();
+  // Tidy what the date/time removal left behind: empty brackets like "( , )", doubled spaces.
+  text = text.replace(/\(\s*[,;:\-–—\s]*\)/g, " ").replace(/\s+/g, " ").replace(/\s+([,;:])/g, "$1").trim();
 
-  // Place: "… at Kuala Lumpur" (capitalised, at the end)
-  let location = "";
-  const loc = LOCATION.exec(text);
-  if (loc) {
-    location = loc[1].replace(/[.,;]+$/, "").trim();
-    const without = text.slice(0, loc.index).trim();
-    // Keep "Interview at Google" whole when removing the place would leave a one-word title.
-    if (without.split(/\s+/).filter(Boolean).length >= 2) text = without;
+  let title = text, location = "", description = "";
+
+  const colon = text.indexOf(":");
+  if (colon > 0 && text.slice(colon + 1).trim()) {
+    // "Bukit Jalil: Hot Flow Yoga runs with a capacity of 18…" → place + title + description
+    const left = text.slice(0, colon).trim(), right = text.slice(colon + 1).trim();
+    const placeLeft = placeLike(left) && detectKind(left) === "other";
+    if (placeLeft && wordCount(right) >= 8) {
+      location = left;
+      [title, description] = leadPhrase(right);
+    } else if (placeLeft && wordCount(right) <= 7) {
+      location = left; title = right;                       // "Kuala Lumpur: Sarah's wedding"
+    } else {
+      title = left; description = right;                    // "Dinner with Jo: bring wine"
+    }
+  } else if (text.length > 90) {
+    [title, description] = leadPhrase(text);                // a long sentence: short title + the rest as description
   }
 
-  let title = text;
+  // Place: "… at Kuala Lumpur" (capitalised, at the end of the title)
+  if (!location) {
+    const loc = LOCATION.exec(title);
+    if (loc) {
+      location = loc[1].replace(/[.,;]+$/, "").trim();
+      const without = title.slice(0, loc.index).trim();
+      // Keep "Interview at Google" whole when removing the place would leave a one-word title.
+      if (without.split(/\s+/).filter(Boolean).length >= 2) title = without;
+    }
+  }
+
   for (let i = 0; i < 3; i++) title = title.replace(DANGLING, "").trim();
   title = tidyTitle(title) || tidyTitle(line);
+  description = description.replace(/^[\s,;:\-–—.]+|[\s,;:\-–—]+$/g, "").trim();
+  if (description) description = description[0].toUpperCase() + description.slice(1);
 
   if (!start) { start = defaultDate || today; dateReason = defaultDate ? "No date in the line, so the day you picked" : "No date found. Please check the date"; }
 
-  return { title, kind: detectKind(title, location), start_date: start, end_date: end, start_time, end_time, location, url, notes: "", dateFound, dateReason };
+  return { title, kind: detectKind(title, location), start_date: start, end_date: end, start_time, end_time, location, url, notes: description, dateFound, dateReason };
+}
+
+const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
+/** "Bandar Utama, One Square" / "Damansara Heights, The Five @ KPD": two or more capitalised words, no sentence in sight. */
+function placeLike(s: string): boolean {
+  const tokens = s.split(/[\s,]+/).filter(Boolean);
+  if (tokens.length < 2 || tokens.length > 8) return false;
+  return tokens.every((t) => /^[A-Z0-9@&(]/.test(t) || /^(?:of|the|de|la|and|at|&|@)$/i.test(t));
+}
+
+// Where a short title ends and the descriptive sentence begins.
+const TITLE_END = /\s+(?:runs?|is|are|will|has|have|takes?|starts?|begins?|features?|includes?|offers?|aimed|designed|suitable|for|with|that|which)\b|\s[–—-]\s|[,;.]/i;
+
+/** Splits "Megastrength Foundations runs with a capacity of 8, aimed at…" into ["Megastrength Foundations", "runs with…"]. */
+function leadPhrase(text: string): [string, string] {
+  const m = TITLE_END.exec(text.slice(3));          // never cut inside the first few characters
+  let cut = m ? m.index + 3 : -1;
+  if (cut < 0 || cut > 80) {
+    const words = text.split(/\s+/);
+    if (words.length <= 8) return [text, ""];
+    cut = words.slice(0, 8).join(" ").length;       // no natural break: first 8 words
+  }
+  return [text.slice(0, cut).trim(), text.slice(cut).trim()];
 }
 
 /** One draft per line of pasted text (bullets and numbering are ignored). */

@@ -11,7 +11,8 @@ Bali holiday 20-27 Dec
 Google interview tomorrow 10am
 Mum's 60th birthday party next Saturday 6-9pm
 New Year party 31 Dec 10pm - 2am
-AWS Summit 24/11 https://aws.amazon.com/summit`;
+AWS Summit 24/11 https://aws.amazon.com/summit
+Bukit Jalil (Thursday, 26 November 2026): Hot Flow Yoga runs with a capacity of 18, aimed at busy professionals, 7:15 PM – 8:05 PM`;
 
 type Row = EventDraft;
 
@@ -72,7 +73,7 @@ export default function EventBatchAdd({ today, seed = "", defaultDate, onClose, 
               <button role="tab" aria-selected className="on">Batch dump</button>
             </div>
             <p className="muted" style={{ marginTop: 0 }}>
-              One event per line. Write them naturally: the date (“12 Dec”, “next Saturday”, “20-27 Dec”), time (“4pm”, “6-9pm”), place (“at Kuala Lumpur”) and a link if you have one. THEO sorts out the type, dates and times.
+              One event per line. Write them naturally: the date (“12 Dec”, “next Saturday”, “20-27 Dec”), time (“4pm”, “6-9pm”), place (“at Kuala Lumpur”) and a link if you have one. A longer sentence after the title, or after a colon, becomes the description. THEO sorts out the type, dates, times and place.
             </p>
             <textarea className="textarea" style={{ minHeight: 200 }} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={PLACEHOLDER} />
             {error && <div className="err" style={{ marginTop: 12 }}>{error}</div>}
@@ -125,6 +126,8 @@ export default function EventBatchAdd({ today, seed = "", defaultDate, onClose, 
                       <input className="input" placeholder="Location" value={r.location} onChange={(e) => upd(i, { location: e.target.value })} aria-label="Location" />
                       <input className="input" placeholder="Link (optional)" inputMode="url" autoCapitalize="none" value={r.url} onChange={(e) => upd(i, { url: e.target.value })} aria-label="Link" />
                     </div>
+                    <textarea className="textarea" style={{ minHeight: 64, marginTop: 8 }} placeholder="Description (optional): what it is, who it's for, details…"
+                      value={r.notes} onChange={(e) => upd(i, { notes: e.target.value })} aria-label="Description" />
                     {issue && <div className="err" style={{ marginTop: 8 }} role="alert">{issue}</div>}
                   </div>
                 );

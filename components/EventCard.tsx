@@ -69,6 +69,7 @@ export default function EventCard({ event: e, today, onFavorite, onOpen }: Props
           <span className="ev-pill" style={{ background: k.pill, color: k.accent }}>{k.label}</span>
           {soon && <span className="ev-soon">{soon}</span>}
         </div>
+        {e.notes && <p className="ev-desc">{e.notes}</p>}
         <div className="ev-foot">
           <span className="ev-loc">{e.location && <><Pin /> <span>{e.location}</span></>}</span>
           {e.files?.length > 0 && <span className="ev-files" title={e.files.map((f) => f.name).join(", ")}>📎 {e.files.length}</span>}

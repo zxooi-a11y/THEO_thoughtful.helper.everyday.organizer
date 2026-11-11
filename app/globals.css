@@ -411,3 +411,4 @@ a.final-link:hover { border-color: var(--accent); }
 @media (max-width: 860px) {
   .ev-fields { grid-template-columns: 1fr 1fr; }
 }
+.ev-desc { margin: -4px 0 0; font-size: 13px; line-height: 1.5; color: #6e6a63; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

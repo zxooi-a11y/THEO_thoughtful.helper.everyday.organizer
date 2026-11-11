@@ -271,7 +271,10 @@ export default function EventsPage() {
               </label>
             </div>
 
-            <textarea className="textarea" style={{ minHeight: 70 }} placeholder="Notes: dress code, who's going, gift ideas…" value={draft.notes} onChange={(e) => upd({ notes: e.target.value })} />
+            <label className="stack" style={{ gap: 6 }}>
+              <span className="small" style={{ fontWeight: 700 }}>Description <span className="muted">(optional)</span></span>
+              <textarea className="textarea" style={{ minHeight: 90 }} placeholder="What's it about? Details, dress code, who's going, gift ideas…" value={draft.notes} onChange={(e) => upd({ notes: e.target.value })} />
+            </label>
 
             {/* Files: THEO reads them and can fill in the event for you */}
             <div className="attach" style={{ marginTop: 0 }}>
