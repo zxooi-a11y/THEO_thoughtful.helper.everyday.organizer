@@ -10,7 +10,7 @@ import KpiCards, { type Stats } from "@/components/KpiCards";
 import TaskDetail from "@/components/TaskDetail";
 import TaskEditor from "@/components/TaskEditor";
 import ProjectSelect from "@/components/ProjectSelect";
-import { api, fmtDate, localToday, MONTH_LONG, relDue, WEEKDAY } from "@/components/client";
+import { api, fmtDate, localToday, localTz, MONTH_LONG, relDue, WEEKDAY } from "@/components/client";
 import { BellIcon, CalendarIcon, ChevronL, ChevronR, PlusIcon, SearchIcon } from "@/components/Icons";
 
 type View = "day" | "week" | "month";
@@ -82,7 +82,7 @@ export default function CalendarPage() {
         api<Task[]>(`/api/tasks?${qs}`),
         api<Task[]>(`/api/tasks?status=doing`),
         api<Project[]>("/api/projects"),
-        api<Stats>(`/api/stats?today=${today}`),
+        api<Stats>(`/api/stats?today=${today}&tz=${encodeURIComponent(localTz())}`),
         api<LifeEvent[]>(`/api/events?${range}`).catch(() => [] as LifeEvent[]),
         view === "day" ? api<Task[]>(`/api/tasks?${openQs}`) : Promise.resolve([] as Task[]),
       ]);

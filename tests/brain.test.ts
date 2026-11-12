@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { analyzeTask, planGoal, splitBulk, type BrainContext } from "../lib/brain/index.ts";
+import { analyzeTask, splitBulk, type BrainContext } from "../lib/brain/index.ts";
 import { parseDue } from "../lib/brain/dates.ts";
 
 // Monday 9 Nov 2026
@@ -51,19 +51,6 @@ test("learned lead time drives due date", () => {
 
 test("bulk split handles bullets and numbers", () => {
   assert.deepEqual(splitBulk("- a b\n2) c d\n• e f\n\n[ ] g h"), ["a b", "c d", "e f", "g h"]);
-});
-
-test("goal playbooks", () => {
-  const p = planGoal("build a business", TODAY);
-  assert.equal(p.source, "playbook");
-  assert.equal(p.projectName, "Business");
-  assert.ok(p.tasks.length >= 8);
-  assert.equal(p.tasks[0].dueDate, TODAY);
-  const mine = planGoal("start a bakery business", TODAY, [
-    { kind: "goal", key_words: ["start", "bakery", "business"], title: "Start a bakery business", uses: 1, steps: [{ text: "Bake test batch", offsetDays: 1 }] },
-  ]);
-  assert.equal(mine.source, "learned");
-  assert.equal(mine.tasks[0].title, "Bake test batch");
 });
 
 test("a brief steers project, due date and priority", () => {
@@ -369,4 +356,50 @@ test("day view: open tasks stay visible until finished", async () => {
   assert.deepEqual(doneTasksOnDay(all, "2026-11-13"), []);
   // Order: overdue, then soonest due, undated last
   assert.deepEqual(sortForDay(openTasksOnDay(all, "2026-11-12", TODAY_)).map((t) => (t as { id: number }).id), [2, 1, 4, 3]);
+});
+
+test("on-time analysis: early, on time and late", async () => {
+  const { summarize, verdict, slip, onTimeRate } = await import("../lib/timeliness.ts");
+  const { normalizeCategory, isCategory } = await import("../lib/categories.ts");
+  // slip: negative early, 0 on the day, positive late
+  assert.equal(slip({ due: "2026-11-13", done_on: "2026-11-12" }), -1);
+  assert.equal(verdict({ due: "2026-11-13", done_on: "2026-11-12" }), "early");
+  assert.equal(verdict({ due: "2026-11-13", done_on: "2026-11-13" }), "onTime");
+  assert.equal(verdict({ due: "2026-11-13", done_on: "2026-11-16" }), "late");
+
+  const projects = [
+    { id: 1, name: "Finance Lang", color: "indigo", category: "work" },
+    { id: 2, name: "Car", color: "slate", category: "admin" },
+    { id: 3, name: "D&D", color: "purple", category: null },
+  ];
+  const rows = [
+    { project_id: 1, due: "2026-11-13", done_on: "2026-11-11" },   // 2 days early
+    { project_id: 1, due: "2026-11-10", done_on: "2026-11-10" },   // on time
+    { project_id: 1, due: "2026-11-04", done_on: "2026-11-09" },   // 5 days late
+    { project_id: 2, due: "2026-11-12", done_on: "2026-11-12" },   // on time
+    { project_id: 2, due: "2026-11-02", done_on: "2026-11-05" },   // 3 days late
+    { project_id: 3, due: "2026-11-12", done_on: "2026-11-11" },   // 1 day early
+  ];
+  const t = summarize(rows, [{ project_id: 1, open: 2, overdue: 1 }, { project_id: null, open: 1, overdue: 0 }], projects, "2026-11-12");
+  assert.deepEqual([t.summary.early, t.summary.onTime, t.summary.late, t.summary.total], [2, 2, 2, 6]);
+  assert.equal(t.summary.rate, 67);                      // 4 of 6 on time or early
+  assert.equal(t.summary.avgEarlyDays, 1.5);             // (2 + 1) / 2
+  assert.equal(t.summary.avgLateDays, 4);                // (5 + 3) / 2
+  assert.equal(t.summary.worstLateDays, 5);
+  assert.equal(t.byWeek.length, 8);
+  assert.equal(t.byWeek[7].week, "2026-11-09");          // this week (Monday)
+  assert.deepEqual([t.byWeek[7].early, t.byWeek[7].onTime, t.byWeek[7].late], [2, 2, 1]);
+  assert.deepEqual([t.byWeek[6].early, t.byWeek[6].onTime, t.byWeek[6].late], [0, 0, 1]);   // week of 2 Nov
+  // By classification: work, admin, then the unclassified project and the no-project tasks together
+  assert.deepEqual(t.byCategory.map((c) => c.category), ["work", "admin", null]);
+  const work = t.byCategory[0];
+  assert.deepEqual([work.early, work.onTime, work.late, work.open, work.overdue, work.projects], [1, 1, 1, 2, 1, 1]);
+  assert.equal(t.byProject.find((p) => p.name === "No project")?.open, 1);
+  assert.equal(onTimeRate({ early: 0, onTime: 0, late: 0 }), null);
+  assert.equal(summarize([], [], [], "2026-11-12").summary.rate, null);
+
+  // Categories: only the four known ones are accepted
+  assert.equal(normalizeCategory(" Work "), "work");
+  for (const bad of ["", "fun", null, 3, "work; drop"]) assert.equal(normalizeCategory(bad), null, String(bad));
+  assert.ok(isCategory("play") && !isCategory("misc"));
 });

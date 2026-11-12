@@ -327,9 +327,6 @@ export default function EventsPage() {
               <div className="row">
                 {draft.id && <button type="button" className="btn danger" onClick={remove}>Delete</button>}
                 {draft.id && <button type="button" className="btn ghost" onClick={convertToTask} title="Turn this event into a task with a due date">Convert to task</button>}
-                {draft.title && (
-                  <a className="btn ghost" href={`/plan?goal=${encodeURIComponent(`Prepare for ${draft.title}`)}`} title="Turn this event into a step-by-step prep plan">Plan prep tasks →</a>
-                )}
               </div>
               <div className="row">
                 <button type="button" className="btn" onClick={closeDraft}>Cancel</button>

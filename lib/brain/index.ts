@@ -12,8 +12,6 @@ export type { EntryType } from "./entryType.ts";
 export type { EventDraft } from "./events.ts";
 import type { FileContext } from "./files.ts";
 
-export { planGoal } from "./goals.ts";
-export type { GoalPlan, PlannedTask } from "./goals.ts";
 export type { LearnedPlan, PlanStep } from "./steps.ts";
 export type { LearnedKeywords, ProjectRef } from "./classify.ts";
 export { buildFileContext, buildEventHints } from "./files.ts";

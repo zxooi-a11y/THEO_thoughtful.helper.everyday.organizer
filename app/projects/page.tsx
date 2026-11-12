@@ -8,13 +8,17 @@ import ProjectSelect from "@/components/ProjectSelect";
 import TaskEditor from "@/components/TaskEditor";
 import { eventTheme, timeRange, type LifeEvent } from "@/lib/events";
 import { PlusIcon } from "@/components/Icons";
+import CategoryPicker, { CategoryTag } from "@/components/CategoryPicker";
+import { CATEGORIES } from "@/lib/categories";
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [name, setName] = useState("");
   const [color, setColor] = useState("blue");
-  const [editing, setEditing] = useState<{ id: number; name: string; color: string } | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>("all"); // all | work | life | admin | play | none
+  const [editing, setEditing] = useState<{ id: number; name: string; color: string; category: string | null } | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [events, setEvents] = useState<LifeEvent[]>([]);
   const [error, setError] = useState("");
@@ -32,13 +36,13 @@ export default function ProjectsPage() {
   async function add(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    try { await api("/api/projects", { body: { name, color } }); setName(""); load(); }
+    try { await api("/api/projects", { body: { name, color, category } }); setName(""); setCategory(null); load(); }
     catch (er) { setError((er as Error).message); }
   }
 
   async function saveEdit() {
     if (!editing) return;
-    try { await api(`/api/projects/${editing.id}`, { method: "PATCH", body: { name: editing.name, color: editing.color } }); setEditing(null); load(); }
+    try { await api(`/api/projects/${editing.id}`, { method: "PATCH", body: { name: editing.name, color: editing.color, category: editing.category } }); setEditing(null); load(); }
     catch (er) { setError((er as Error).message); }
   }
 
@@ -61,8 +65,11 @@ export default function ProjectsPage() {
     load();
   }
   // Busiest projects first, then the rest alphabetically; Inbox last.
-  const groups: (Project | null)[] = [...projects].sort((a, b) => count(b) - count(a) || a.name.localeCompare(b.name));
-  groups.push(null);
+  const inFilter = (p: Project) => filter === "all" || (filter === "none" ? !p.category : p.category === filter);
+  const groups: (Project | null)[] = [...projects].filter(inFilter).sort((a, b) => count(b) - count(a) || a.name.localeCompare(b.name));
+  if (filter === "all") groups.push(null); // the Inbox isn't a project, so it only shows unfiltered
+  const filterCount = (k: string) => projects.filter((p) => (k === "all" ? true : k === "none" ? !p.category : p.category === k)).length;
+  const anyClassified = projects.some((p) => p.category);
 
   return (
     <>
@@ -73,6 +80,12 @@ export default function ProjectsPage() {
         <div className="row wrap">
           <input className="input grow" style={{ minWidth: 220 }} placeholder="e.g. Wedding, Side hustle, Kids, Renovation" value={name} onChange={(e) => setName(e.target.value)} />
           <Swatches value={color} onPick={setColor} />
+        </div>
+        <div className="stack" style={{ gap: 6 }}>
+          <span className="small" style={{ fontWeight: 700 }}>Classify it <span className="muted">· optional. Is this work, life, admin or play?</span></span>
+          <CategoryPicker value={category} onPick={setCategory} />
+        </div>
+        <div className="row">
           <button className="btn primary" disabled={!name.trim()}><span className="row" style={{ gap: 6 }}><PlusIcon size={16} /> Add project</span></button>
         </div>
       </form>
@@ -80,6 +93,19 @@ export default function ProjectsPage() {
         You can also create a project from any project dropdown with <b>+ New project…</b>. Moving a task to another project teaches THEO where similar tasks belong.
       </p>
       {error && <div className="err" style={{ marginBottom: 20 }}>{error}</div>}
+
+      <div className="cat-filter" role="tablist" aria-label="Filter projects by classification">
+        <button type="button" role="tab" aria-selected={filter === "all"} className={`cat-btn${filter === "all" ? " all-on" : ""}`} onClick={() => setFilter("all")}>All<span className="n">{filterCount("all")}</span></button>
+        {CATEGORIES.map((c) => (
+          <button type="button" key={c.key} role="tab" aria-selected={filter === c.key} className={`cat-btn${filter === c.key ? " all-on" : ""}`} onClick={() => setFilter(c.key)} title={c.hint}>
+            <span aria-hidden>{c.emoji}</span> {c.label}<span className="n">{filterCount(c.key)}</span>
+          </button>
+        ))}
+        {anyClassified && filterCount("none") > 0 && (
+          <button type="button" role="tab" aria-selected={filter === "none"} className={`cat-btn${filter === "none" ? " all-on" : ""}`} onClick={() => setFilter("none")}>Not classified<span className="n">{filterCount("none")}</span></button>
+        )}
+      </div>
+      {filter !== "all" && groups.length === 0 && <div className="muted" style={{ marginBottom: 16 }}>No projects classified here yet. Open a project&apos;s <b>Edit</b> to classify it.</div>}
 
       <div className="cards">
         {groups.map((p) => {
@@ -100,6 +126,10 @@ export default function ProjectsPage() {
                   <input className="input" autoFocus value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })}
                     onKeyDown={(e) => e.key === "Enter" && saveEdit()} />
                   <Swatches value={editing.color} onPick={(k) => setEditing({ ...editing, color: k })} />
+                  <div className="stack" style={{ gap: 6 }}>
+                    <span className="small" style={{ fontWeight: 700 }}>Classification <span className="muted">· work, life, admin or play</span></span>
+                    <CategoryPicker compact value={editing.category} onPick={(k) => setEditing({ ...editing, category: k })} />
+                  </div>
                   <div className="row between">
                     <button className="btn danger small" onClick={() => remove(p)}>Delete project</button>
                     <div className="row">
@@ -110,10 +140,13 @@ export default function ProjectsPage() {
                 </div>
               ) : (
                 <div className="row between">
-                  <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
+                  <span className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+                    <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
+                    {p && <CategoryTag category={p.category} />}
+                  </span>
                   <span className="row" style={{ gap: 4 }}>
                     <span className="muted small">{list.length} task{list.length === 1 ? "" : "s"} · {evs.length} event{evs.length === 1 ? "" : "s"} · {p?.done_count ?? 0} done</span>
-                    {p && <button className="btn ghost small" style={{ padding: "4px 8px" }} onClick={() => setEditing({ id: p.id, name: p.name, color: p.color })}>Edit</button>}
+                    {p && <button className="btn ghost small" style={{ padding: "4px 8px" }} onClick={() => setEditing({ id: p.id, name: p.name, color: p.color, category: p.category ?? null })}>Edit</button>}
                   </span>
                 </div>
               )}

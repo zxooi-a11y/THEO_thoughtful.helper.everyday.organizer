@@ -144,3 +144,6 @@ INSERT INTO projects (name, color) VALUES
   ('Work', 'blue'), ('Errands', 'pink'), ('Learning', 'purple'),
   ('Social', 'teal'), ('Business', 'indigo')
 ON CONFLICT (name) DO NOTHING;
+
+-- A project keeps its own name + colour tag, and can also sit under one of four general classifications.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS category TEXT CHECK (category IN ('work','life','admin','play'));

@@ -1,6 +1,6 @@
 # THEO: Thoughtful Helper for Everyday Organizing
 
-A calendar and life-task tracker in one app. Paste a list of tasks and THEO decides which project each belongs to, tags it, picks a due date, and writes the steps to get it done. Give it a big goal like "build a business" and it builds a dated, step-by-step plan. It learns from every correction you make, and everything is stored in your Neon Postgres database.
+A calendar and life-task tracker in one app. Paste a list of tasks and THEO decides which project each belongs to, tags it, picks a due date, and writes the steps to get it done. It learns from every correction you make, and everything is stored in your Neon Postgres database.
 
 **Running costs: $0.** Next.js on the Vercel Hobby plan, Neon free tier, and a built-in "brain" that needs no paid AI.
 
@@ -12,8 +12,7 @@ A calendar and life-task tracker in one app. Paste a list of tasks and THEO deci
 | **Smart due dates** | Reads phrases like "tomorrow", "by Friday", "next week", "in 2 weeks", "this weekend", "end of month", "20/12" and "Dec 3". If you don't give a date, it uses how fast *you* usually finish tasks in that project, or a sensible default. Every date comes with a short reason. |
 | **Auto project and tags** | Matches built-in vocabulary to projects, plus `#hashtags`, and adds action tags (call, pay, buy, book…). Words like "urgent", "ASAP" or `!` set high priority. |
 | **Steps for every task** | Templates for calls, payments, bookings, purchases, cleaning, repairs, learning, events, writing and more. |
-| **Goal planner** | Playbooks for business, fitness, learning, moving house, saving money, launches and job hunting, plus a general framework for anything else. Each step is a dated task with its own sub-steps. |
-| **Learning** | Moving a task to another project trains the word→project weights (`learned_keywords`). Rewriting a task's steps or editing a goal plan saves your version (`learned_plans`), and similar tasks or goals reuse it. Finished tasks teach THEO your typical lead time per project. |
+| **Learning** | Moving a task to another project trains the word→project weights (`learned_keywords`). Rewriting a task's steps saves your version (`learned_plans`), and similar tasks reuse it. Finished tasks teach THEO your typical lead time per project. |
 | **Files on tasks** | Attach files when adding tasks (batch or single) or later from a task's panel. THEO reads text, markdown, CSV, JSON, PDF and Word files and uses them for Auto: what the task is about (project and tags), a deadline it finds ("pay by 3 December"), urgency ("final notice"), and, in Single task mode, a checklist as the steps. On an existing task it offers the deadline and checklist as one-tap suggestions. Images and scanned PDFs are stored but not read. |
 | **Final work** | Every task has a "Final work" field: a link to the finished result (design, document, site, repo…) and a one-line description. Add it from the task panel or the Edit window; finished tasks show it as a "view final work" card in the Archive. Only normal web links are accepted. |
 | **Event descriptions** | Every event has a Description (optional). In Batch dump, a long line such as "Bukit Jalil (Thursday, 26 November 2026): Hot Flow Yoga runs with a capacity of 18, aimed at professionals, 7:15 PM – 8:05 PM" is split into a short title, the place, the date and times, and a description. Descriptions show on the event cards. (Stored in the existing notes field, so earlier notes appear as descriptions.) |
@@ -25,7 +24,9 @@ A calendar and life-task tracker in one app. Paste a list of tasks and THEO deci
 | **Project picker** | Every project dropdown is searchable: type to narrow the list, use the arrow keys and Enter, and "New project…" is always available (type a name first and it creates that one). |
 | **Day view** | The Day view lists everything you haven't finished, so a task due Friday is already there on Thursday (overdue ones too; undated tasks live on today). A task can have an optional Start date and stays out of the Day view until then. Tick a task off right in the list: finishing moves its date to the day you finished it (the original due date is kept and shown as "Was due…"), and unticking restores it. Looking back at a past day shows what was due or finished then. |
 | **Calendar** | Month, week and day views. Drag a task to another day to reschedule it. Hover a day and press **+** to add tasks for that date. |
-| **Analytics** | Activity level, tasks completed per month, goal progress, a 30-day trend, and where your time goes by project. |
+| **Project classifications** | Besides its own name and colour tag, a project can sit under one of four general classifications: **💼 Work**, **🌿 Life**, **📋 Admin** (car errands, bills, paperwork) or **🎲 Play** (hobbies, planning a D&D night). Pick one when you create a project (from any project dropdown or the Projects page), or change it later under the project field in the event/task window or with **Edit** on the Projects page. Tap the chosen one again to remove it. The Projects page can be filtered by classification, cards show the label, and existing projects start unclassified, so nothing is guessed for you. |
+| **Analytics** | Activity level, tasks completed per month, how often you finish on time, a 30-day trend, and where your time goes by project. |
+| **On-time analysis** | The Analytics page shows how often you finish **early, on the day, or late**, judged against each task's original due date (finishing moves the date, so the original is kept). It includes averages ("2.5 days ahead", "4 days behind"), the last 8 weeks, and breakdowns by classification and by project, plus what is still open and overdue now. The calendar's third card shows your on-time rate for the last 30 days. |
 
 ## Setup (about 10 minutes, free)
 
@@ -43,9 +44,6 @@ Go to the Neon console, open the project, click **Connect**, and copy the **pool
 
 > Alternative: Vercel → Storage → **Connect Neon** links the database and sets `DATABASE_URL` for you.
 
-### 3. (Optional) Smarter plans with free AI
-Create a free key at https://aistudio.google.com/apikey (no card needed) and add it as `GEMINI_API_KEY`. THEO will then use AI for goals that don't match a built-in playbook. If the key is missing, or the free quota runs out, THEO falls back to its built-in planner, so you can't be charged.
-
 ## Run locally
 ```bash
 cp .env.example .env.local   # paste DATABASE_URL
@@ -56,11 +54,12 @@ npm test                     # brain unit tests
 
 ## Project layout
 ```
-app/              pages (calendar, plan, projects, archive, analytics) + API routes
+app/              pages (calendar, events, projects, archive, analytics) + API routes
 components/       UI pieces (BulkAdd, TaskDetail, KpiCards, Sparkline, Sidebar)
-lib/brain/        the free "AI": dates.ts, classify.ts, steps.ts, goals.ts
+lib/brain/        the free "AI": dates.ts, classify.ts, steps.ts
 lib/repo.ts       all SQL + the learning updates
-lib/ai.ts         optional Gemini integration
+lib/timeliness.ts early / on-time / late analysis (pure, tested)
+lib/categories.ts the four project classifications
 db/schema.sql     database schema (idempotent)
 ```
 
@@ -68,7 +67,7 @@ db/schema.sql     database schema (idempotent)
 - **Event times:** events have a start time and an end time (or leave both empty for all day). A same-day event must end after it starts; for something that runs past midnight, set an end date as well. THEO reads ranges such as "4 – 6 PM" from invites too.
 - **Events too:** attach tickets, invites and bookings to an event. THEO reads the file and offers to fill in the event's type, date (it prefers the event date over an RSVP deadline), time and link with one tap, and event cards show a 📎 count.
 - Stored in your Neon database (no extra service or cost). Limit: **4 MB per file** (Vercel's free request size) and 10 files per task. Uploads stop at 350 MB total to stay inside Neon's free 0.5 GB.
-- Reading happens inside your own app; file contents are never sent to any outside service (including the optional Gemini key).
+- Reading happens inside your own app; file contents are never sent to any outside service.
 - With `APP_PASSCODE` set, downloads need the passcode too.
 - Files nothing points to (abandoned uploads, deleted tasks) are cleaned up automatically after 24 hours.
 

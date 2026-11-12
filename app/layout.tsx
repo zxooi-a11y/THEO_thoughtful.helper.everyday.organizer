@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "THEO · Thoughtful Helper & Everyday Organizer",
-  description: "Thoughtful Helper for Everyday Organizing — calendar, tasks and goal planning in one.",
+  description: "Thoughtful Helper for Everyday Organizing — calendar, tasks and events in one.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#fdfcfa" };
 

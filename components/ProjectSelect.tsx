@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import type { Project } from "@/lib/types";
 import { colorOf, PALETTE } from "@/lib/colors";
 import Swatches from "./Swatches";
+import CategoryPicker from "./CategoryPicker";
+import { categoryOf } from "@/lib/categories";
 import { api } from "./client";
 import { PlusIcon, SearchIcon } from "./Icons";
 
@@ -44,6 +46,7 @@ export default function ProjectSelect({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(PALETTE[0]);
+  const [newCat, setNewCat] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const nameInput = useRef<HTMLInputElement>(null);
   const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number; maxH: number } | null>(null);
@@ -112,6 +115,7 @@ export default function ProjectSelect({
   function startCreate() {
     const used = new Set(projects.map((p) => p.color));
     setNewName(query.trim());
+    setNewCat(null);
     setNewColor(PALETTE.find((c) => !used.has(c)) ?? PALETTE[projects.length % PALETTE.length]);
     setCreating(true);
   }
@@ -125,7 +129,7 @@ export default function ProjectSelect({
     if (same) { onChange(same.id); setCreating(false); close(); return; }
     setSaving(true);
     try {
-      const p = await api<Project>("/api/projects", { body: { name, color: newColor } });
+      const p = await api<Project>("/api/projects", { body: { name, color: newColor, category: newCat } });
       onCreated?.(p);
       onChange(p.id);
       setCreating(false);
@@ -176,6 +180,8 @@ export default function ProjectSelect({
               />
               <div className="combo-form-label">Colour</div>
               <Swatches value={newColor} onPick={setNewColor} />
+              <div className="combo-form-label">Classification <span className="muted">· optional</span></div>
+              <CategoryPicker compact value={newCat} onPick={setNewCat} />
               <div className="combo-form-actions">
                 <button type="button" className="btn small" onClick={() => setCreating(false)}>Back</button>
                 <button type="button" className="btn primary small" disabled={!newName.trim() || saving} onClick={create}>{saving ? "Creating…" : "Create project"}</button>
@@ -201,7 +207,7 @@ export default function ProjectSelect({
                   onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(o)}
                 >
                   {o.kind === "project" ? <i className="combo-dot" style={{ background: colorOf(o.p.color).dot }} /> : <i className="combo-dot ghost" />}
-                  <span className="combo-label">{o.kind === "project" ? o.p.name : o.label}</span>
+                  <span className="combo-label">{o.kind === "project" ? o.p.name : o.label}{o.kind === "project" && categoryOf(o.p.category) && <span className="combo-cat" title={categoryOf(o.p.category)!.label}>{categoryOf(o.p.category)!.emoji}</span>}</span>
                   {isSel && <span className="combo-check" aria-hidden>✓</span>}
                 </div>
               );

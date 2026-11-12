@@ -2,14 +2,14 @@
 import Sparkline from "./Sparkline";
 
 export type Stats = {
-  kpi: { done_week: number; due_week: number; done_month: number; done_prev_month: number; overdue: number; goal_total: number; goal_done: number; open_total: number };
+  kpi: { done_week: number; due_week: number; done_month: number; done_prev_month: number; overdue: number; ontime_n: number; timed_n: number; open_total: number };
   perDay: { day: string; created: number; done: number }[];
-  perProject: { name: string; color: string; open: number; done: number }[];
+  perProject: { name: string; color: string; category?: string | null; open: number; done: number }[];
 };
 
 export default function KpiCards({ stats }: { stats: Stats | null }) {
   // Coerce to numbers so a missing value never shows as "NaN".
-  const ZERO: Stats["kpi"] = { done_week: 0, due_week: 0, done_month: 0, done_prev_month: 0, overdue: 0, goal_total: 0, goal_done: 0, open_total: 0 };
+  const ZERO: Stats["kpi"] = { done_week: 0, due_week: 0, done_month: 0, done_prev_month: 0, overdue: 0, ontime_n: 0, timed_n: 0, open_total: 0 };
   const k: Stats["kpi"] | undefined = stats
     ? (Object.fromEntries(Object.keys(ZERO).map((key) => [key, Number((stats.kpi as Record<string, unknown> | undefined)?.[key]) || 0])) as Stats["kpi"])
     : undefined;
@@ -19,7 +19,8 @@ export default function KpiCards({ stats }: { stats: Stats | null }) {
   let cum = 0;
   const cumulative = days.slice(-14).map((d) => (cum += d.done));
   const monthDelta = k && k.done_prev_month ? Math.round(((k.done_month - k.done_prev_month) / k.done_prev_month) * 100) : null;
-  const goalPct = k && k.goal_total ? Math.round((k.goal_done / k.goal_total) * 100) : 0;
+  // Of what you finished in the last 30 days, how much was done by its due date (early or on the day)
+  const onTimePct = k && k.timed_n ? Math.round((k.ontime_n / k.timed_n) * 100) : null;
 
   return (
     <div className="kpis">
@@ -41,11 +42,11 @@ export default function KpiCards({ stats }: { stats: Stats | null }) {
       </div>
       <div className="card kpi">
         <div>
-          <div className="label"><span className="full">Goal progress</span><span className="short">Goals</span></div>
-          <div className="value">{goalPct}%</div>
-          <div className="delta"><i style={{ background: "#5CC97B" }} /> <span className="muted">{k?.goal_done ?? 0}/{k?.goal_total ?? 0}<span className="full"> goal steps</span></span></div>
+          <div className="label"><span className="full">Finished on time</span><span className="short">On time</span></div>
+          <div className="value">{onTimePct === null ? "–" : `${onTimePct}%`}</div>
+          <div className="delta"><i style={{ background: "#5CC97B" }} /> <span className="muted">{k?.timed_n ? `${k.ontime_n}/${k.timed_n}` : "Nothing yet"}<span className="full">{k?.timed_n ? " in 30 days" : ""}</span></span></div>
         </div>
-        <span className="spark"><Sparkline kind="bar" values={[goalPct / 100]} color="#5CC97B" /></span>
+        <span className="spark"><Sparkline kind="bar" values={[(onTimePct ?? 0) / 100]} color="#5CC97B" /></span>
       </div>
     </div>
   );

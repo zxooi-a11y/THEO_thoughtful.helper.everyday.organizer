@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import type { FileMeta, Project } from "@/lib/types";
 import type { TaskDraft } from "@/lib/brain";
 import type { EventDraft } from "@/lib/brain/events";
@@ -205,7 +204,6 @@ export default function BulkAdd({ projects: initialProjects, today, defaultDate,
               <>
                 <p className="muted" style={{ marginTop: 0 }}>
                   One entry per line. Paste a whole brain-dump and mention dates naturally (“by Friday”, “next week”, “20/12”). THEO decides whether each is a <b>task</b> (something to do) or an <b>event</b> (something you attend), and you can flip it in the review.
-                  Got something big like “build a business”? Use the <Link href="/plan" style={{ color: "var(--accent-dark)", fontWeight: 700 }}>Goal planner</Link>.
                 </p>
                 <textarea className="textarea" style={{ minHeight: 200 }} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder={PLACEHOLDER} />
               </>

@@ -11,7 +11,6 @@ export const GET = handle(async (req: Request) => {
     to: isISODate(u.get("to")) ? u.get("to")! : undefined,
     search: u.get("q")?.slice(0, 100) || undefined,
     projectId: Number(u.get("project")) || undefined,
-    goalId: Number(u.get("goal")) || undefined,
     status: ["todo", "doing", "later", "done"].includes(u.get("status") ?? "") ? u.get("status")! : undefined,
     open: u.get("open") === "1",
     archived: u.get("archived") === "1",

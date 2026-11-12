@@ -4,6 +4,7 @@ import { deleteOrphans, linkFiles } from "./filesRepo";
 import type { BrainContext, LearnedPlan } from "./brain";
 import { keywords } from "./brain/text";
 import type { Project, Step, Task } from "./types";
+import { summarize, type DoneRow, type OpenRow, type ProjectInfo } from "./timeliness";
 
 const TASK_SELECT = `
   SELECT t.id, t.title, t.notes, t.final_url, t.final_note, t.project_id, t.goal_id, t.tags,
@@ -18,24 +19,27 @@ const TASK_SELECT = `
 // ── Projects ─────────────────────────────────────────────────────
 export function listProjects() {
   return q<Project>(`
-    SELECT p.id, p.name, p.color,
+    SELECT p.id, p.name, p.color, p.category,
       (SELECT count(*)::int FROM tasks t WHERE t.project_id = p.id AND t.status <> 'done' AND NOT t.archived) AS open_count,
       (SELECT count(*)::int FROM tasks t WHERE t.project_id = p.id AND t.status = 'done') AS done_count,
       (SELECT count(*)::int FROM events e WHERE e.project_id = p.id AND COALESCE(e.end_date, e.start_date) >= CURRENT_DATE - 1) AS event_count
     FROM projects p ORDER BY p.name`);
 }
 
-export async function ensureProject(name: string, color = "blue"): Promise<number> {
+export async function ensureProject(name: string, color = "blue", category: string | null = null): Promise<number> {
   const rows = await q<{ id: number }>(
-    `INSERT INTO projects (name, color) VALUES ($1, $2)
-     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`, [name.trim(), color]);
+    `INSERT INTO projects (name, color, category) VALUES ($1, $2, $3)
+     ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id`, [name.trim(), color, category]);
   return rows[0].id;
 }
 
-export async function updateProject(id: number, patch: { name?: string; color?: string }) {
+/** `category: null` clears the classification; leaving it out keeps what is there. */
+export async function updateProject(id: number, patch: { name?: string; color?: string; category?: string | null }) {
   const rows = await q<Project>(
-    `UPDATE projects SET name = COALESCE($2, name), color = COALESCE($3, color) WHERE id = $1 RETURNING id, name, color`,
-    [id, patch.name ?? null, patch.color ?? null]);
+    `UPDATE projects SET name = COALESCE($2, name), color = COALESCE($3, color),
+       category = CASE WHEN $4::boolean THEN $5 ELSE category END
+     WHERE id = $1 RETURNING id, name, color, category`,
+    [id, patch.name ?? null, patch.color ?? null, patch.category !== undefined, patch.category ?? null]);
   return rows[0] ?? null;
 }
 
@@ -91,7 +95,7 @@ export async function learnKeywords(title: string, projectId: number, delta = 1,
   if (fromProjectId && fromProjectId !== projectId) await bump(fromProjectId, -Math.abs(delta));
 }
 
-/** Remember a step list you shaped yourself so similar tasks/goals reuse it. */
+/** Remember a step list you shaped yourself so similar tasks reuse it. */
 export async function learnPlan(kind: "task" | "goal", title: string, steps: unknown[]) {
   const kw = keywords(title);
   if (!kw.length || !steps.length) return;
@@ -157,7 +161,7 @@ export function getTask(id: number) {
   return q<Task>(`${TASK_SELECT} WHERE t.id = $1`, [id]).then((r) => r[0] ?? null);
 }
 
-export function listTasks(opts: { from?: string; to?: string; search?: string; projectId?: number; archived?: boolean; status?: string; goalId?: number; open?: boolean }) {
+export function listTasks(opts: { from?: string; to?: string; search?: string; projectId?: number; archived?: boolean; status?: string; open?: boolean }) {
   const where: string[] = [];
   const p: unknown[] = [];
   const add = (cond: string, v: unknown) => { p.push(v); where.push(cond.replace("?", `$${p.length}`)); };
@@ -166,22 +170,21 @@ export function listTasks(opts: { from?: string; to?: string; search?: string; p
   if (opts.search) add("(t.title ILIKE ? OR t.notes ILIKE $" + (p.length + 1) + " OR array_to_string(t.tags, ' ') ILIKE $" + (p.length + 1) + ")", `%${opts.search}%`);
   if (opts.projectId) add("t.project_id = ?", opts.projectId);
   if (opts.status) add("t.status = ?", opts.status);
-  if (opts.goalId) add("t.goal_id = ?", opts.goalId);
   if (opts.open) where.push("t.status <> 'done'");
   where.push(opts.archived ? "(t.archived OR t.status = 'done')" : "NOT t.archived");
   return q<Task>(`${TASK_SELECT} WHERE ${where.join(" AND ")} ORDER BY t.due_date NULLS LAST, t.priority, t.id LIMIT 1000`, p);
 }
 
 export type NewTask = {
-  title: string; notes?: string; projectId: number | null; goalId?: number | null; tags?: string[];
+  title: string; notes?: string; projectId: number | null; tags?: string[];
   dueDate: string | null; dueReason?: string; estimate?: string; priority?: number; steps?: string[]; fileIds?: number[];
 };
 
 export async function createTask(t: NewTask, opts: { learn?: boolean } = {}): Promise<number> {
   const [row] = await q<{ id: number }>(
-    `INSERT INTO tasks (title, notes, project_id, goal_id, tags, due_date, due_reason, estimate, priority)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-    [t.title, t.notes ?? "", t.projectId, t.goalId ?? null, t.tags ?? [], t.dueDate, t.dueReason ?? "", t.estimate ?? "", t.priority ?? 2]);
+    `INSERT INTO tasks (title, notes, project_id, tags, due_date, due_reason, estimate, priority)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [t.title, t.notes ?? "", t.projectId, t.tags ?? [], t.dueDate, t.dueReason ?? "", t.estimate ?? "", t.priority ?? 2]);
   const steps = (t.steps ?? []).map((s) => s.trim()).filter(Boolean);
   if (steps.length) {
     await q(`INSERT INTO task_steps (task_id, position, text) SELECT $1, i, s FROM unnest($2::text[]) WITH ORDINALITY AS u(s, i)`, [row.id, steps]);
@@ -237,7 +240,7 @@ export async function updateTask(id: number, patch: TaskPatch) {
     // If you rewrote the step list (not just ticked boxes), remember your version.
     const oldText = before.steps.map((x) => x.text).join("\n");
     const newText = s.map((x) => x.text.trim()).join("\n");
-    if (oldText !== newText && !before.goal_id) await learnPlan("task", patch.title ?? before.title, s.map((x) => ({ text: x.text.trim(), estimate: patch.estimate ?? before.estimate })));
+    if (oldText !== newText) await learnPlan("task", patch.title ?? before.title, s.map((x) => ({ text: x.text.trim(), estimate: patch.estimate ?? before.estimate })));
   }
 
   // Re-filed under a different project → strongest learning signal.
@@ -252,30 +255,15 @@ export async function deleteTask(id: number) {
   await deleteOrphans(24); // files that belonged only to this task
 }
 
-// ── Goals ────────────────────────────────────────────────────────
-export function listGoals() {
-  return q(`
-    SELECT g.id, g.title, g.project_id, g.created_at,
-      count(t.id)::int AS total, count(t.id) FILTER (WHERE t.status = 'done')::int AS done,
-      to_char(min(t.due_date) FILTER (WHERE t.status <> 'done'), 'YYYY-MM-DD') AS next_due
-    FROM goals g LEFT JOIN tasks t ON t.goal_id = g.id
-    GROUP BY g.id ORDER BY g.created_at DESC`);
-}
-
-export async function createGoal(title: string, projectId: number | null) {
-  const [g] = await q<{ id: number }>(`INSERT INTO goals (title, project_id) VALUES ($1, $2) RETURNING id`, [title, projectId]);
-  return g.id;
-}
-
-export async function deleteGoal(id: number) {
-  await q(`DELETE FROM goals WHERE id = $1`, [id]);
-  await deleteOrphans(24);
-}
-
 // ── Analytics ────────────────────────────────────────────────────
-export async function stats(today: string) {
+// A finished task is judged against the date it was ORIGINALLY due (finishing moves due_date to the
+// day it was done), and the day it was finished in the person's own time zone.
+const DUE = "COALESCE(t.original_due, t.due_date)";
+const DUE0 = "COALESCE(original_due, due_date)"; // same, for queries with no table alias
+
+export async function stats(today: string, tz = "UTC") {
   const [[kpi], perDay, perProject] = await Promise.all([
-    q<{ done_week: number; due_week: number; done_month: number; done_prev_month: number; overdue: number; goal_total: number; goal_done: number; open_total: number }>(`
+    q<{ done_week: number; due_week: number; done_month: number; done_prev_month: number; overdue: number; ontime_n: number; timed_n: number; open_total: number }>(`
       SELECT
         count(*) FILTER (WHERE status = 'done' AND completed_at >= $1::date - 6)::int AS done_week,
         count(*) FILTER (WHERE due_date BETWEEN $1::date - 6 AND $1::date)::int AS due_week,
@@ -283,21 +271,39 @@ export async function stats(today: string) {
         count(*) FILTER (WHERE status = 'done' AND completed_at >= date_trunc('month', $1::date) - interval '1 month'
                                              AND completed_at <  date_trunc('month', $1::date))::int AS done_prev_month,
         count(*) FILTER (WHERE status <> 'done' AND NOT archived AND due_date < $1::date)::int AS overdue,
-        count(*) FILTER (WHERE goal_id IS NOT NULL)::int AS goal_total,
-        count(*) FILTER (WHERE goal_id IS NOT NULL AND status = 'done')::int AS goal_done,
+        count(*) FILTER (WHERE status = 'done' AND completed_at IS NOT NULL AND ${DUE0} IS NOT NULL
+                           AND (completed_at AT TIME ZONE $2)::date >= $1::date - 29
+                           AND (completed_at AT TIME ZONE $2)::date <= ${DUE0})::int AS ontime_n,
+        count(*) FILTER (WHERE status = 'done' AND completed_at IS NOT NULL AND ${DUE0} IS NOT NULL
+                           AND (completed_at AT TIME ZONE $2)::date >= $1::date - 29)::int AS timed_n,
         count(*) FILTER (WHERE status <> 'done' AND NOT archived)::int AS open_total
-      FROM tasks`, [today]),
+      FROM tasks`, [today, tz]),
     q<{ day: string; created: number; done: number }>(`
       SELECT to_char(d, 'YYYY-MM-DD') AS day,
         (SELECT count(*)::int FROM tasks WHERE created_at::date = d) AS created,
         (SELECT count(*)::int FROM tasks WHERE completed_at::date = d) AS done
       FROM generate_series($1::date - 29, $1::date, interval '1 day') AS d ORDER BY d`, [today]),
-    q<{ name: string; color: string; open: number; done: number }>(`
-      SELECT p.name, p.color,
+    q<{ name: string; color: string; category: string | null; open: number; done: number }>(`
+      SELECT p.name, p.color, p.category,
         count(t.id) FILTER (WHERE t.status <> 'done' AND NOT t.archived)::int AS open,
         count(t.id) FILTER (WHERE t.status = 'done')::int AS done
       FROM projects p LEFT JOIN tasks t ON t.project_id = p.id
       GROUP BY p.id ORDER BY count(t.id) DESC, p.name`),
   ]);
   return { kpi, perDay, perProject };
+}
+
+/** Early / on time / late for everything you have finished, plus what is still open, by week, project and classification. */
+export async function timeliness(today: string, tz = "UTC") {
+  const [rows, open, projects] = await Promise.all([
+    q<DoneRow>(`
+      SELECT t.project_id, to_char(${DUE}, 'YYYY-MM-DD') AS due,
+             to_char((t.completed_at AT TIME ZONE $1)::date, 'YYYY-MM-DD') AS done_on
+      FROM tasks t WHERE t.status = 'done' AND t.completed_at IS NOT NULL AND ${DUE} IS NOT NULL`, [tz]),
+    q<OpenRow>(`
+      SELECT t.project_id, count(*)::int AS open, count(*) FILTER (WHERE t.due_date < $1::date)::int AS overdue
+      FROM tasks t WHERE t.status <> 'done' AND NOT t.archived GROUP BY t.project_id`, [today]),
+    q<ProjectInfo>(`SELECT id, name, color, category FROM projects`),
+  ]);
+  return summarize(rows, open, projects, today);
 }
