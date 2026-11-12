@@ -531,3 +531,18 @@ select.pill { appearance: auto; }
 .wheel-item.on { color: var(--text); font-weight: 800; font-size: 22px; }
 .wheel:nth-of-type(1) .wheel-item { justify-content: end; padding-right: 22px; }
 .wheel:nth-of-type(2) .wheel-item { justify-content: start; padding-left: 22px; }
+
+/* Day view */
+.day-note { padding: 2px 4px 6px; line-height: 1.5; }
+.day-group { margin: 10px 4px 0; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.day-item { align-items: center; }
+.day-item.is-done { opacity: .6; }
+.day-item .check { margin: 0; flex: none; }
+.due-badge { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--card); border-radius: 8px; padding: 5px 9px; white-space: nowrap; }
+.due-badge.late { color: var(--danger); background: #fdecef; }
+@media (max-width: 860px) {
+  .day-item { flex-wrap: wrap; }
+  .day-item .grow { flex: 1 1 60%; }
+  .due-badge { margin-left: 30px; }
+}
+.stats-toggle[aria-expanded="false"] { margin-bottom: 22px; }

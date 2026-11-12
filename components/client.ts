@@ -3,10 +3,15 @@
 import { daysBetween } from "@/lib/brain/dates";
 
 export async function api<T = unknown>(url: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  let body = init?.body;
+  // Finishing a task files it under the day it was done, in the person's own time zone, so say what day that is
+  if (init?.method === "PATCH" && /^\/api\/tasks\/\d+$/.test(url) && body && typeof body === "object" && !("today" in body)) {
+    body = { ...(body as Record<string, unknown>), today: localToday() };
+  }
   const res = await fetch(url, {
-    method: init?.method ?? (init?.body ? "POST" : "GET"),
-    headers: init?.body ? { "content-type": "application/json" } : undefined,
-    body: init?.body ? JSON.stringify(init.body) : undefined,
+    method: init?.method ?? (body ? "POST" : "GET"),
+    headers: body ? { "content-type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
   });
   const data = await res.json().catch(() => ({}));

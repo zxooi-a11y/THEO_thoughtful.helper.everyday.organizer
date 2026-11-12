@@ -16,6 +16,8 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
     patch.final_url = link;
   }
   if (typeof b.final_note === "string") patch.final_note = b.final_note.trim().slice(0, 300);
+  if ("start_date" in b) patch.start_date = isISODate(b.start_date) ? b.start_date : null;
+  if (isISODate(b.today)) patch.today = b.today;
   if ("project_id" in b) patch.project_id = b.project_id ? Number(b.project_id) : null;
   if (Array.isArray(b.tags)) patch.tags = b.tags.map(String).slice(0, 10);
   if ("due_date" in b) patch.due_date = isISODate(b.due_date) ? b.due_date : null;

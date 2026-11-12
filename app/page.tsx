@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
 import { eventTheme, kindOf, timeRange, type LifeEvent } from "@/lib/events";
+import { doneTasksOnDay, openTasksOnDay, sortForDay } from "@/lib/dayView";
 import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
@@ -25,6 +26,7 @@ export default function CalendarPage() {
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [openTasks, setOpenTasks] = useState<Task[]>([]); // every unfinished task (for the Day view)
   const [events, setEvents] = useState<LifeEvent[]>([]);
   const [doing, setDoing] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -72,17 +74,22 @@ export default function CalendarPage() {
       if (projectFilter) qs.set("project", projectFilter);
       const range = new URLSearchParams({ from: days[0], to: days[days.length - 1] });
       if (projectFilter) range.set("project", projectFilter);
-      const [t, d, p, s, ev] = await Promise.all([
+      // The Day view lists everything still open, not just what is due that day
+      const openQs = new URLSearchParams({ open: "1" });
+      if (search) openQs.set("q", search);
+      if (projectFilter) openQs.set("project", projectFilter);
+      const [t, d, p, s, ev, open] = await Promise.all([
         api<Task[]>(`/api/tasks?${qs}`),
         api<Task[]>(`/api/tasks?status=doing`),
         api<Project[]>("/api/projects"),
         api<Stats>(`/api/stats?today=${today}`),
         api<LifeEvent[]>(`/api/events?${range}`).catch(() => [] as LifeEvent[]),
+        view === "day" ? api<Task[]>(`/api/tasks?${openQs}`) : Promise.resolve([] as Task[]),
       ]);
-      setEvents(ev);
+      setEvents(ev); setOpenTasks(open);
       setTasks(t); setDoing(d); setProjects(p); setStats(s); setError("");
     } catch (e) { setError((e as Error).message); }
-  }, [days, search, projectFilter, today]);
+  }, [days, search, projectFilter, today, view]);
 
   useEffect(() => { const id = setTimeout(load, search ? 250 : 0); return () => clearTimeout(id); }, [load, search]);
 
@@ -91,6 +98,16 @@ export default function CalendarPage() {
     for (const t of tasks) if (t.due_date) (m.get(t.due_date) ?? m.set(t.due_date, []).get(t.due_date)!).push(t);
     return m;
   }, [tasks]);
+  // Day view: everything still open that belongs on this day, then what was finished on it
+  const dayOpen = useMemo(() => (view === "day" && cursor ? sortForDay(openTasksOnDay(openTasks, cursor, today)) : []), [view, cursor, openTasks, today]);
+  const dayDone = useMemo(() => (view === "day" && cursor ? doneTasksOnDay(tasks, cursor) : []), [view, cursor, tasks]);
+
+  async function toggleDone(t: Task) {
+    // Tick it off: it files itself under today, the day it was finished (un-ticking restores its due date)
+    await api(`/api/tasks/${t.id}`, { method: "PATCH", body: { status: t.status === "done" ? "todo" : "done" } }).catch((e) => setError(e.message));
+    load();
+  }
+
   const eventsByDay = useMemo(() => {
     const m = new Map<string, LifeEvent[]>();
     for (const e of events) {
@@ -101,12 +118,13 @@ export default function CalendarPage() {
   const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
 
   const selected = useMemo(() => {
-    const all = [...tasks, ...doing];
+    const all = [...tasks, ...doing, ...openTasks];
     return all.find((t) => t.id === selectedId)
       ?? doing[0]
       ?? tasks.filter((t) => t.status !== "done" && t.due_date && t.due_date >= today).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
+      ?? sortForDay(openTasks)[0]   // Day view: the most pressing open task, even if it is due outside the visible range
       ?? null;
-  }, [tasks, doing, selectedId, today]);
+  }, [tasks, doing, openTasks, selectedId, today]);
 
   function onTaskChange(t: Task | null) {
     if (!t) { setSelectedId(null); load(); return; }
@@ -145,6 +163,29 @@ export default function CalendarPage() {
   const showPanel = (id: number) => {
     setSelectedId(id);
     if (isPhone()) setTimeout(() => document.getElementById("task-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  };
+
+  // One row in the Day view: tick box, project, title, and when it is due
+  const dayItem = (t: Task) => {
+    const p = projectById.get(t.project_id ?? -1); const c = colorOf(p?.color);
+    const steps = t.steps.filter((s) => s.done).length;
+    const finished = t.status === "done";
+    const late = !finished && !!t.due_date && t.due_date < today;
+    const due = finished
+      ? (t.original_due && t.original_due !== t.due_date ? `Was due ${fmtDate(t.original_due)}` : "Done")
+      : t.due_date ? `${relDue(t.due_date, today)} · ${fmtDate(t.due_date)}` : "No due date";
+    return (
+      <div key={t.id} className={`day-item${finished ? " is-done" : ""}`} onClick={() => openTask(t)} onDoubleClick={() => setEditing(t)}>
+        <input type="checkbox" className="check" checked={finished} aria-label={finished ? "Mark as not done" : "Mark as done"}
+          onClick={(e) => e.stopPropagation()} onChange={() => toggleDone(t)} />
+        <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
+        <div className="grow">
+          <div style={{ fontWeight: 700, textDecoration: finished ? "line-through" : "none" }}>{t.title}</div>
+          <div className="muted small">{[t.estimate, t.steps.length ? `${steps}/${t.steps.length} steps` : "", t.start_date && t.start_date > today ? `starts ${fmtDate(t.start_date)}` : ""].filter(Boolean).join(" · ") || " "}</div>
+        </div>
+        <span className={`due-badge${late ? " late" : ""}`}>{due}</span>
+      </div>
+    );
   };
 
   const chip = (t: Task) => {
@@ -219,20 +260,11 @@ export default function CalendarPage() {
                   </a>
                 );
               })}
-              {(byDay.get(cursor) ?? []).length === 0 && (eventsByDay.get(cursor) ?? []).length === 0 && <div className="empty">Nothing due {relDue(cursor, today).toLowerCase()}. Enjoy it — or add something.</div>}
-              {(byDay.get(cursor) ?? []).map((t) => {
-                const p = projectById.get(t.project_id ?? -1); const c = colorOf(p?.color);
-                const done = t.steps.filter((s) => s.done).length;
-                return (
-                  <div key={t.id} className="day-item" onClick={() => openTask(t)} onDoubleClick={() => setEditing(t)}>
-                    <span className="chip" style={{ background: c.bg, color: c.fg }}>{p?.name ?? "Inbox"}</span>
-                    <div className="grow">
-                      <div style={{ fontWeight: 700, textDecoration: t.status === "done" ? "line-through" : "none" }}>{t.title}</div>
-                      <div className="muted small">{t.estimate} · {done}/{t.steps.length} steps · {t.status}</div>
-                    </div>
-                  </div>
-                );
-              })}
+              {cursor >= today && <div className="muted small day-note">Everything you haven&apos;t finished is here, including tasks due later. Tick one off and it moves to the day you finished it.</div>}
+              {dayOpen.length === 0 && dayDone.length === 0 && (eventsByDay.get(cursor) ?? []).length === 0 && <div className="empty">All clear for {cursor === today ? "today" : fmtDate(cursor)}. Enjoy it, or add something.</div>}
+              {dayOpen.map((t) => dayItem(t))}
+              {dayDone.length > 0 && <div className="day-group">Done {cursor === today ? "today" : "this day"} · {dayDone.length}</div>}
+              {dayDone.map((t) => dayItem(t))}
             </div>
           ) : (
             <div className={`grid ${view}`}>

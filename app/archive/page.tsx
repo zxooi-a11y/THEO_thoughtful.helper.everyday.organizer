@@ -38,7 +38,7 @@ export default function ArchivePage() {
               <span className="chip" style={{ background: c.bg, color: c.fg, fontSize: 11 }}>{p?.name ?? "Inbox"}</span>
               <div className="grow">
                 <div style={{ fontWeight: 600 }}>{t.title}</div>
-                <div className="muted small">{t.completed_at ? `Done ${fmtDate(t.completed_at.slice(0, 10), true)}` : "Archived"} · was due {fmtDate(t.due_date)}</div>
+                <div className="muted small">{t.completed_at ? `Done ${fmtDate(t.completed_at.slice(0, 10), true)}` : "Archived"} · was due {fmtDate(t.original_due ?? t.due_date)}</div>
                 {t.final_url && <div style={{ marginTop: 6 }}><FinalWorkLink url={t.final_url} note={t.final_note} compact /></div>}
               </div>
               <div className="arch-actions">

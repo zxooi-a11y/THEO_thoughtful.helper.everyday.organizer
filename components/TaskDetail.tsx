@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { colorOf } from "@/lib/colors";
 import type { FileMeta, Project, Step, Task } from "@/lib/types";
 import { addDays } from "@/lib/brain/dates";
-import { api, relDue, timeAgo } from "./client";
+import { api, fmtDate, relDue, timeAgo } from "./client";
 import ProjectSelect from "./ProjectSelect";
 import DateField from "./DateField";
 import FinalWorkLink from "./FinalWork";
@@ -175,6 +175,7 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
           <DateField className="bare" placeholder="No due date" value={task.due_date ?? ""} onChange={(v) => patch({ due_date: v || null })} />
           <span className="muted small">{relDue(task.due_date, today)}</span>
         </div>
+        {task.status === "done" && task.original_due && task.original_due !== task.due_date && <div className="muted small" style={{ marginTop: -6, paddingLeft: 28 }}>Originally due {fmtDate(task.original_due, true)}</div>}
         {task.due_reason && <div className="muted small" style={{ marginTop: -6, paddingLeft: 28 }}>THEO: {task.due_reason}</div>}
         <div className="row"><ClockIcon size={18} />
           <input className="bare" value={estimate} placeholder="Estimate (e.g. 2 hours)" onChange={(e) => setEstimate(e.target.value)}

@@ -337,3 +337,36 @@ test("times: shown as 12-hour, typed in any common way", async () => {
   for (const [input, fb, want] of ok) assert.equal(parseTimeInput(input, fb as "AM" | "PM" | undefined), want, `${input} (${fb})`);
   for (const bad of ["", "25:00", "4:75", "13pm", "0pm", "abc", "4:3", "99"]) assert.equal(parseTimeInput(bad), null, bad);
 });
+
+test("day view: open tasks stay visible until finished", async () => {
+  const { openTasksOnDay, doneTasksOnDay, sortForDay } = await import("../lib/dayView.ts");
+  const T = (o: Record<string, unknown>) => ({ id: 1, title: "t", status: "todo", archived: false, priority: 2, due_date: null, start_date: null, ...o }) as never;
+  const TODAY_ = "2026-11-12";                         // Thursday
+  const friday = T({ id: 1, due_date: "2026-11-13" });
+  const overdue = T({ id: 2, due_date: "2026-11-09" });
+  const undated = T({ id: 3 });
+  const later = T({ id: 4, due_date: "2026-11-30" });
+  const notStarted = T({ id: 5, due_date: "2026-11-20", start_date: "2026-11-16" });
+  const done = T({ id: 6, status: "done", due_date: "2026-11-12" });
+  const all = [friday, overdue, undated, later, notStarted, done];
+  const ids = (d: string) => openTasksOnDay(all, d, TODAY_).map((t) => (t as { id: number }).id).sort();
+
+  // Today: everything still open that has started, including Friday's task and the overdue one
+  assert.deepEqual(ids("2026-11-12"), [1, 2, 3, 4]);
+  // Tomorrow (Friday): Friday's task and later ones still pending, not today's leftovers
+  assert.deepEqual(ids("2026-11-13"), [1, 4]);
+  // Saturday: Friday's task is past due so it is not repeated; the later task is still ahead
+  assert.deepEqual(ids("2026-11-14"), [4]);
+  // After its start date the not-yet-started task appears; before it, it doesn't
+  assert.deepEqual(ids("2026-11-16"), [4, 5]);
+  assert.ok(!ids("2026-11-12").includes(5));
+  // Looking back: only what was due that day
+  assert.deepEqual(ids("2026-11-09"), [2]);
+  assert.deepEqual(ids("2026-11-10"), []);
+  // Done tasks are never "open"; they show on the day they were finished
+  assert.ok(!ids("2026-11-12").includes(6));
+  assert.deepEqual(doneTasksOnDay(all, "2026-11-12").map((t) => (t as { id: number }).id), [6]);
+  assert.deepEqual(doneTasksOnDay(all, "2026-11-13"), []);
+  // Order: overdue, then soonest due, undated last
+  assert.deepEqual(sortForDay(openTasksOnDay(all, "2026-11-12", TODAY_)).map((t) => (t as { id: number }).id), [2, 1, 4, 3]);
+});

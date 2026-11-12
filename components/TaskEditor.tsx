@@ -34,6 +34,7 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
   const [title, setTitle] = useState(task.title);
   const [projectId, setProjectId] = useState<number | null>(task.project_id);
   const [due, setDue] = useState(task.due_date ?? "");
+  const [startDate, setStartDate] = useState(task.start_date ?? "");
   const [priority, setPriority] = useState<1 | 2 | 3>(task.priority);
   const [status, setStatus] = useState<Task["status"]>(task.status);
   const [estimate, setEstimate] = useState(task.estimate);
@@ -60,7 +61,7 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
       const updated = await api<Task>(`/api/tasks/${task.id}`, {
         method: "PATCH",
         body: {
-          title: title.trim(), project_id: projectId, due_date: due || null, priority, status,
+          title: title.trim(), project_id: projectId, due_date: due || null, start_date: startDate || null, priority, status,
           estimate: estimate.trim(), tags: parseTags(tags), notes, final_url: finalUrl, final_note: finalNote,
           steps: steps.filter((s) => s.text.trim()).map((s) => ({ text: s.text.trim(), done: s.done })),
         },
@@ -139,6 +140,11 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
             <input className="input" placeholder="e.g. 2 hours" value={estimate} onChange={(e) => setEstimate(e.target.value)} />
           </label>
         </div>
+
+        <label className="stack" style={{ gap: 6 }}>
+          <span className="small" style={{ fontWeight: 700 }}>Start date <span className="muted">· optional. Until then the task stays out of the Day view</span></span>
+          <DateField placeholder="Show from today" max={due || undefined} value={startDate} onChange={setStartDate} />
+        </label>
 
         <div className="stack" style={{ gap: 6 }}>
           <span className="small" style={{ fontWeight: 700 }}>Priority</span>

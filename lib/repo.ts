@@ -7,7 +7,7 @@ import type { Project, Step, Task } from "./types";
 
 const TASK_SELECT = `
   SELECT t.id, t.title, t.notes, t.final_url, t.final_note, t.project_id, t.goal_id, t.tags,
-         to_char(t.due_date, 'YYYY-MM-DD') AS due_date, t.due_reason, t.estimate, t.priority,
+         to_char(t.due_date, 'YYYY-MM-DD') AS due_date, to_char(t.start_date, 'YYYY-MM-DD') AS start_date, to_char(t.original_due, 'YYYY-MM-DD') AS original_due, t.due_reason, t.estimate, t.priority,
          t.status, t.archived, t.created_at, t.started_at, t.completed_at,
          COALESCE((SELECT json_agg(json_build_object('id', s.id, 'text', s.text, 'done', s.done) ORDER BY s.position)
                    FROM task_steps s WHERE s.task_id = t.id), '[]') AS steps,
@@ -157,7 +157,7 @@ export function getTask(id: number) {
   return q<Task>(`${TASK_SELECT} WHERE t.id = $1`, [id]).then((r) => r[0] ?? null);
 }
 
-export function listTasks(opts: { from?: string; to?: string; search?: string; projectId?: number; archived?: boolean; status?: string; goalId?: number }) {
+export function listTasks(opts: { from?: string; to?: string; search?: string; projectId?: number; archived?: boolean; status?: string; goalId?: number; open?: boolean }) {
   const where: string[] = [];
   const p: unknown[] = [];
   const add = (cond: string, v: unknown) => { p.push(v); where.push(cond.replace("?", `$${p.length}`)); };
@@ -167,6 +167,7 @@ export function listTasks(opts: { from?: string; to?: string; search?: string; p
   if (opts.projectId) add("t.project_id = ?", opts.projectId);
   if (opts.status) add("t.status = ?", opts.status);
   if (opts.goalId) add("t.goal_id = ?", opts.goalId);
+  if (opts.open) where.push("t.status <> 'done'");
   where.push(opts.archived ? "(t.archived OR t.status = 'done')" : "NOT t.archived");
   return q<Task>(`${TASK_SELECT} WHERE ${where.join(" AND ")} ORDER BY t.due_date NULLS LAST, t.priority, t.id LIMIT 1000`, p);
 }
@@ -192,7 +193,9 @@ export async function createTask(t: NewTask, opts: { learn?: boolean } = {}): Pr
 
 export type TaskPatch = Partial<{
   title: string; notes: string; final_url: string; final_note: string; project_id: number | null; tags: string[]; due_date: string | null;
-  estimate: string; priority: number; status: Task["status"]; archived: boolean; steps: Step[];
+  estimate: string; priority: number; status: Task["status"]; archived: boolean; steps: Step[]; start_date: string | null;
+  /** The person's local date today (set when finishing a task, so it lands on the day they did it). */
+  today: string;
 }>;
 
 export async function updateTask(id: number, patch: TaskPatch) {
@@ -201,13 +204,25 @@ export async function updateTask(id: number, patch: TaskPatch) {
   const cols: string[] = [];
   const p: unknown[] = [];
   const set = (col: string, v: unknown) => { p.push(v); cols.push(`${col} = $${p.length}`); };
-  for (const k of ["title", "notes", "final_url", "final_note", "project_id", "tags", "due_date", "estimate", "priority", "archived"] as const) {
+  for (const k of ["title", "notes", "final_url", "final_note", "project_id", "tags", "due_date", "start_date", "estimate", "priority", "archived"] as const) {
     if (k in patch) set(k, patch[k]);
   }
   if (patch.status && patch.status !== before.status) {
     set("status", patch.status);
     if (patch.status === "doing" && !before.started_at) cols.push("started_at = now()");
     cols.push(patch.status === "done" ? "completed_at = now()" : "completed_at = NULL");
+
+    // Finishing a task moves it to the day it was done (remembering when it was due); reopening puts it back.
+    // A date the person edited in the same save wins, but sending the unchanged date back (as the editor does) isn't an edit.
+    const dueEdited = "due_date" in patch && (patch.due_date ?? null) !== (before.due_date ?? null);
+    if (!dueEdited) {
+      const day = patch.today ?? new Date().toISOString().slice(0, 10);
+      if (patch.status === "done") {
+        if (before.due_date !== day) { set("original_due", before.original_due ?? before.due_date); set("due_date", day); }
+      } else if (before.status === "done" && before.original_due) {
+        set("due_date", before.original_due); set("original_due", null);
+      }
+    }
   }
   if (cols.length) { p.push(id); await q(`UPDATE tasks SET ${cols.join(", ")} WHERE id = $${p.length}`, p); }
 

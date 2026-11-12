@@ -24,6 +24,10 @@ export type Task = {
   completed_at: string | null;
   steps: Step[];
   files: FileMeta[];
+  /** Optional: the Day view hides the task until this date. */
+  start_date: string | null;
+  /** Set when finishing moved the task to the day it was done: the date it was originally due. */
+  original_due: string | null;
   /** Link to the finished work, and what it is. Empty until added. */
   final_url: string;
   final_note: string;

@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- Link to the finished work (a design, doc, site, repo…) and a one-line description of it.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS final_url  TEXT NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS final_note TEXT NOT NULL DEFAULT '';
+-- Optional start date (hidden from the Day view until then) and, once a task is finished, the date it was originally due
+-- (finishing moves due_date to the day it was completed; reopening restores it).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS original_due DATE;
 CREATE INDEX IF NOT EXISTS tasks_due_idx     ON tasks (due_date);
 CREATE INDEX IF NOT EXISTS tasks_project_idx ON tasks (project_id);
 CREATE INDEX IF NOT EXISTS tasks_goal_idx    ON tasks (goal_id);
