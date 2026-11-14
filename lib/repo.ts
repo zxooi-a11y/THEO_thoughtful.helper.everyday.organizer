@@ -1,6 +1,6 @@
 // All database access + the "learning" side effects live here.
 import { q } from "./db";
-import { finishDates } from "./finish";
+import { correctFinishDay, finishDates } from "./finish";
 import { deleteOrphans, linkFiles } from "./filesRepo";
 import type { BrainContext, LearnedPlan } from "./brain";
 import { keywords } from "./brain/text";
@@ -236,9 +236,10 @@ export async function updateTask(id: number, patch: TaskPatch) {
   } else if (correctsFinishDay(before, patch)) {
     // On a finished task the date IS the day it was finished: changing it corrects when it was done
     // (for when you ticked it off a day or two late). The original due date stays as it was.
-    const day = patch.due_date as string;
-    set("original_due", finishDates(before, day).original_due);
-    p.push(day);
+    const fix = correctFinishDay(before, patch.due_date as string);
+    set("due_date", fix.due_date);
+    set("original_due", fix.original_due);
+    p.push(fix.completed_on);
     cols.push(`completed_at = ($${p.length}::date + time '12:00') AT TIME ZONE 'UTC'`);
   }
   if (cols.length) { p.push(id); await q(`UPDATE tasks SET ${cols.join(", ")} WHERE id = $${p.length}`, p); }

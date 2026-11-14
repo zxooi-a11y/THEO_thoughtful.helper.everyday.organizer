@@ -404,6 +404,13 @@ test("on-time analysis: early, on time and late", async () => {
   assert.ok(isCategory("play") && !isCategory("misc"));
 });
 
+test("correcting the finish day sets the date, the finish time and keeps the original due", async () => {
+  const { correctFinishDay } = await import("../lib/finish.ts");
+  // Due the 13th, ticked on the 14th (late); really done on the 12th
+  assert.deepEqual(correctFinishDay({ due_date: "2026-11-14", original_due: "2026-11-13" }, "2026-11-12"),
+    { due_date: "2026-11-12", original_due: "2026-11-13", completed_on: "2026-11-12" });
+});
+
 test("finishing keeps the original due date; correcting the finish day changes only the done day", async () => {
   const { finishDates } = await import("../lib/finish.ts");
   // Due Fri 13th, ticked on Thu 12th → date moves to the 12th, original kept
