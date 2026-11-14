@@ -403,3 +403,15 @@ test("on-time analysis: early, on time and late", async () => {
   for (const bad of ["", "fun", null, 3, "work; drop"]) assert.equal(normalizeCategory(bad), null, String(bad));
   assert.ok(isCategory("play") && !isCategory("misc"));
 });
+
+test("finishing keeps the original due date; correcting the finish day changes only the done day", async () => {
+  const { finishDates } = await import("../lib/finish.ts");
+  // Due Fri 13th, ticked on Thu 12th → date moves to the 12th, original kept
+  assert.deepEqual(finishDates({ due_date: "2026-11-13", original_due: null }, "2026-11-12"), { due_date: "2026-11-12", original_due: "2026-11-13" });
+  // Ticked late on the 14th, then corrected to the 13th (the real day): original stays the 13th → cleared, as it was on time
+  assert.deepEqual(finishDates({ due_date: "2026-11-14", original_due: "2026-11-13" }, "2026-11-13"), { due_date: "2026-11-13", original_due: null });
+  // Corrected to the 11th: the original (13th) is still kept, never overwritten by the earlier finish date
+  assert.deepEqual(finishDates({ due_date: "2026-11-12", original_due: "2026-11-13" }, "2026-11-11"), { due_date: "2026-11-11", original_due: "2026-11-13" });
+  // No due date at all
+  assert.deepEqual(finishDates({ due_date: null, original_due: null }, "2026-11-12"), { due_date: "2026-11-12", original_due: null });
+});

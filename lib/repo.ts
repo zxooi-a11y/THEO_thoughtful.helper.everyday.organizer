@@ -1,5 +1,6 @@
 // All database access + the "learning" side effects live here.
 import { q } from "./db";
+import { finishDates } from "./finish";
 import { deleteOrphans, linkFiles } from "./filesRepo";
 import type { BrainContext, LearnedPlan } from "./brain";
 import { keywords } from "./brain/text";
@@ -201,6 +202,10 @@ export type TaskPatch = Partial<{
   today: string;
 }>;
 
+/** A new date sent for an already-finished task (no status change) means "I actually finished it on this day". */
+const correctsFinishDay = (before: Task, patch: TaskPatch) =>
+  before.status === "done" && (!patch.status || patch.status === before.status) && !!patch.due_date && patch.due_date !== before.due_date;
+
 export async function updateTask(id: number, patch: TaskPatch) {
   const before = await getTask(id);
   if (!before) return null;
@@ -208,6 +213,7 @@ export async function updateTask(id: number, patch: TaskPatch) {
   const p: unknown[] = [];
   const set = (col: string, v: unknown) => { p.push(v); cols.push(`${col} = $${p.length}`); };
   for (const k of ["title", "notes", "final_url", "final_note", "project_id", "tags", "due_date", "start_date", "estimate", "priority", "archived"] as const) {
+    if (k === "due_date" && correctsFinishDay(before, patch)) continue; // handled below as "finished on"
     if (k in patch) set(k, patch[k]);
   }
   if (patch.status && patch.status !== before.status) {
@@ -221,11 +227,19 @@ export async function updateTask(id: number, patch: TaskPatch) {
     if (!dueEdited) {
       const day = patch.today ?? new Date().toISOString().slice(0, 10);
       if (patch.status === "done") {
-        if (before.due_date !== day) { set("original_due", before.original_due ?? before.due_date); set("due_date", day); }
+        const d = finishDates(before, day);
+        if (before.due_date !== day) { set("original_due", d.original_due); set("due_date", d.due_date); }
       } else if (before.status === "done" && before.original_due) {
         set("due_date", before.original_due); set("original_due", null);
       }
     }
+  } else if (correctsFinishDay(before, patch)) {
+    // On a finished task the date IS the day it was finished: changing it corrects when it was done
+    // (for when you ticked it off a day or two late). The original due date stays as it was.
+    const day = patch.due_date as string;
+    set("original_due", finishDates(before, day).original_due);
+    p.push(day);
+    cols.push(`completed_at = ($${p.length}::date + time '12:00') AT TIME ZONE 'UTC'`);
   }
   if (cols.length) { p.push(id); await q(`UPDATE tasks SET ${cols.join(", ")} WHERE id = $${p.length}`, p); }
 

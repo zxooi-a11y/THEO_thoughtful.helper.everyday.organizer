@@ -129,10 +129,11 @@ export default function TaskEditor({ task, projects: initialProjects, today, onC
         <div className="form-row">
           <label className="stack" style={{ gap: 6 }}>
             <span className="row between" style={{ minHeight: 22 }}>
-              <span className="small" style={{ fontWeight: 700 }}>Due date</span>
-              {due && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => setDue("")}>Clear</button>}
+              <span className="small" style={{ fontWeight: 700 }}>{task.status === "done" ? "Finished on" : "Due date"}</span>
+              {due && task.status !== "done" && <button type="button" className="btn ghost small" style={{ padding: "0 6px" }} onClick={() => setDue("")}>Clear</button>}
             </span>
             <DateField placeholder="No due date" value={due} onChange={setDue} />
+            {task.status === "done" && <span className="muted small">Ticked it off late? Pick the day you actually finished.</span>}
             {task.due_reason && due === (task.due_date ?? "") && <span className="muted small">THEO: {task.due_reason}</span>}
           </label>
           <label className="stack" style={{ gap: 6 }}>

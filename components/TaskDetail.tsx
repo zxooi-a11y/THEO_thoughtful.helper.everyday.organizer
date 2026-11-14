@@ -172,8 +172,9 @@ export default function TaskDetail({ task, projects, today, onChange, onEdit }: 
 
       <div className="meta">
         <div className="row"><CalendarIcon size={18} />
+          {task.status === "done" && <span className="small" style={{ fontWeight: 700 }}>Finished on</span>}
           <DateField className="bare" placeholder="No due date" value={task.due_date ?? ""} onChange={(v) => patch({ due_date: v || null })} />
-          <span className="muted small">{relDue(task.due_date, today)}</span>
+          <span className="muted small">{task.status === "done" ? "change it if you ticked it off late" : relDue(task.due_date, today)}</span>
         </div>
         {task.status === "done" && task.original_due && task.original_due !== task.due_date && <div className="muted small" style={{ marginTop: -6, paddingLeft: 28 }}>Originally due {fmtDate(task.original_due, true)}</div>}
         {task.due_reason && <div className="muted small" style={{ marginTop: -6, paddingLeft: 28 }}>THEO: {task.due_reason}</div>}
