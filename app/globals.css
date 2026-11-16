@@ -115,8 +115,14 @@ h2 { font-size: 15px; font-weight: 800; margin: 0; }
 .search select { border: 0; background: transparent; font-weight: 700; outline: none; padding: 8px; max-width: 45%; }
 
 /* ── Layout of calendar page ─────────────────── */
-.cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; align-items: start; }
+.cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w, 340px); gap: 28px; align-items: start; }
 .side-col { display: flex; flex-direction: column; gap: 22px; position: sticky; top: 24px; }
+/* Draggable divider on the left edge of the side column (desktop only) */
+.side-resizer { position: absolute; left: -20px; top: 0; bottom: 0; width: 12px; cursor: col-resize; touch-action: none; z-index: 5; border-radius: 6px; }
+.side-resizer::after { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; border-radius: 2px; background: transparent; transition: background .12s; }
+.side-resizer:hover::after, .side-resizer:focus-visible::after, body.resizing .side-resizer::after { background: var(--accent); }
+body.resizing { cursor: col-resize; user-select: none; }
+@media (max-width: 1200px) { .side-resizer { display: none; } }
 
 /* KPI */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 18px; margin: 18px 0 40px; }
@@ -534,7 +540,12 @@ select.pill { appearance: auto; }
 
 /* Day view */
 .day-note { padding: 2px 4px 6px; line-height: 1.5; }
-.day-group { margin: 10px 4px 0; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.day-section { display: flex; flex-direction: column; gap: 10px; }
+.day-group { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; padding: 4px; border: 0; background: transparent; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); cursor: pointer; border-radius: 8px; }
+.day-group:hover { color: var(--text); }
+.day-group.late { color: var(--danger); }
+.day-group i { width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; margin: 0 3px 0 2px; }
+.day-group i.open { transform: rotate(45deg) translate(-1px, -1px); }
 .day-item { align-items: center; }
 .day-item.is-done { opacity: .6; }
 .day-item .check { margin: 0; flex: none; }

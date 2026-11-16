@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
 import { eventTheme, kindOf, timeRange, type LifeEvent } from "@/lib/events";
-import { doneTasksOnDay, openTasksOnDay, sortForDay } from "@/lib/dayView";
+import { doneTasksOnDay, groupForDay, openTasksOnDay, sortForDay } from "@/lib/dayView";
 import type { Project, Task } from "@/lib/types";
 import BulkAdd from "@/components/BulkAdd";
 import KpiCards, { type Stats } from "@/components/KpiCards";
@@ -99,7 +99,38 @@ export default function CalendarPage() {
     return m;
   }, [tasks]);
   // Day view: everything still open that belongs on this day, then what was finished on it
+  // Day view sections (overdue / due that day / coming up / done) can be folded away; remembered on this device.
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  useEffect(() => { try { setFolded(new Set(JSON.parse(localStorage.getItem("theo:daySections") ?? "[]"))); } catch {} }, []);
+  const toggleFold = (key: string) => setFolded((f) => {
+    const n = new Set(f); if (n.has(key)) n.delete(key); else n.add(key);
+    try { localStorage.setItem("theo:daySections", JSON.stringify([...n])); } catch {}
+    return n;
+  });
+
+  // Right-hand column width (desktop): drag the divider to resize, double-click it to reset.
+  const SIDE_DEFAULT = 340;
+  const [sideW, setSideW] = useState(SIDE_DEFAULT);
+  useEffect(() => { try { const w = Number(localStorage.getItem("theo:sideW")); if (w >= 280) setSideW(w); } catch {} }, []);
+  const clampSide = (w: number) => Math.round(Math.min(Math.max(280, w), Math.min(760, window.innerWidth * 0.6)));
+  const saveSide = (w: number) => { try { localStorage.setItem("theo:sideW", String(w)); } catch {} };
+  function startResize(e: React.PointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    const startX = e.clientX, startW = sideW;
+    let w = startW;
+    const move = (ev: PointerEvent) => { w = clampSide(startW + (startX - ev.clientX)); setSideW(w); };
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.classList.remove("resizing"); saveSide(w); };
+    document.body.classList.add("resizing");
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  }
+  function resizeKey(e: React.KeyboardEvent) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    const w = clampSide(sideW + (e.key === "ArrowLeft" ? 24 : -24)); setSideW(w); saveSide(w);
+  }
+
   const dayOpen = useMemo(() => (view === "day" && cursor ? sortForDay(openTasksOnDay(openTasks, cursor, today)) : []), [view, cursor, openTasks, today]);
+  const daySections = useMemo(() => groupForDay(dayOpen, cursor, today), [dayOpen, cursor, today]);
   const dayDone = useMemo(() => (view === "day" && cursor ? doneTasksOnDay(tasks, cursor) : []), [view, cursor, tasks]);
 
   async function toggleDone(t: Task) {
@@ -218,7 +249,7 @@ export default function CalendarPage() {
       {error && <div className="err" style={{ marginBottom: 20 }}>{error}</div>}
       {notice && <div className="hint-banner" role="status" style={{ marginBottom: 20 }}>✓ {notice} <a href="/events" style={{ fontWeight: 700, textDecoration: "underline" }}>Open Events</a></div>}
 
-      <div className="cal-layout">
+      <div className="cal-layout" style={{ "--side-w": `${sideW}px` } as React.CSSProperties}>
         <section>
           <button type="button" className="stats-toggle" onClick={toggleStats} aria-expanded={statsOpen} aria-controls="stats-body">
             <span>
@@ -262,9 +293,22 @@ export default function CalendarPage() {
               })}
               {cursor >= today && <div className="muted small day-note">Everything you haven&apos;t finished is here, including tasks due later. Tick one off and it moves to the day you finished it.</div>}
               {dayOpen.length === 0 && dayDone.length === 0 && (eventsByDay.get(cursor) ?? []).length === 0 && <div className="empty">All clear for {cursor === today ? "today" : fmtDate(cursor)}. Enjoy it, or add something.</div>}
-              {dayOpen.map((t) => dayItem(t))}
-              {dayDone.length > 0 && <div className="day-group">Done {cursor === today ? "today" : "this day"} · {dayDone.length}</div>}
-              {dayDone.map((t) => dayItem(t))}
+              {daySections.map((s) => (
+                <div key={s.key} className="day-section" data-section={s.key}>
+                  <button type="button" className={`day-group${s.key === "overdue" ? " late" : ""}`} aria-expanded={!folded.has(s.key)} onClick={() => toggleFold(s.key)}>
+                    <i className={folded.has(s.key) ? "" : "open"} aria-hidden /> {s.label} · {s.tasks.length}
+                  </button>
+                  {!folded.has(s.key) && s.tasks.map((t) => dayItem(t))}
+                </div>
+              ))}
+              {dayDone.length > 0 && (
+                <div className="day-section" data-section="done">
+                  <button type="button" className="day-group" aria-expanded={!folded.has("done")} onClick={() => toggleFold("done")}>
+                    <i className={folded.has("done") ? "" : "open"} aria-hidden /> Done {cursor === today ? "today" : "this day"} · {dayDone.length}
+                  </button>
+                  {!folded.has("done") && dayDone.map((t) => dayItem(t))}
+                </div>
+              )}
             </div>
           ) : (
             <div className={`grid ${view}`}>
@@ -290,6 +334,8 @@ export default function CalendarPage() {
         </section>
 
         <aside className="side-col">
+          <div className="side-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the side column" tabIndex={0} title="Drag to resize · double-click to reset"
+            onPointerDown={startResize} onKeyDown={resizeKey} onDoubleClick={() => { setSideW(SIDE_DEFAULT); saveSide(SIDE_DEFAULT); }} />
           <div className="soft-card">
             <h2>At work</h2>
             {doing.length === 0 && <div className="muted small" style={{ marginTop: 12 }}>Nothing in progress. Pick a task and hit “Accept the task”.</div>}

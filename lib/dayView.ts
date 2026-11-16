@@ -31,3 +31,22 @@ export function sortForDay(list: Task[]): Task[] {
     return da.localeCompare(db) || a.priority - b.priority || a.id - b.id;
   });
 }
+
+export type DaySection = { key: "overdue" | "today" | "upcoming"; label: string; tasks: Task[] };
+
+/**
+ * Splits the open tasks of the Day view by when they are due, relative to the day being looked at:
+ * already overdue, due that day (undated tasks count as today), and due later. Empty sections are left out.
+ */
+export function groupForDay(list: Task[], day: string, today: string): DaySection[] {
+  const sorted = sortForDay(list);
+  const overdue = sorted.filter((t) => t.due_date && t.due_date < day);
+  const upcoming = sorted.filter((t) => t.due_date && t.due_date > day);
+  const here = sorted.filter((t) => !t.due_date || t.due_date === day);
+  const out: DaySection[] = [
+    { key: "overdue", label: "Overdue", tasks: overdue },
+    { key: "today", label: day === today ? "Due today" : "Due this day", tasks: here },
+    { key: "upcoming", label: "Coming up", tasks: upcoming },
+  ];
+  return out.filter((s) => s.tasks.length > 0);
+}

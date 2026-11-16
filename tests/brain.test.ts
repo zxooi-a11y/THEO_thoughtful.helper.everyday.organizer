@@ -422,3 +422,15 @@ test("finishing keeps the original due date; correcting the finish day changes o
   // No due date at all
   assert.deepEqual(finishDates({ due_date: null, original_due: null }, "2026-11-12"), { due_date: "2026-11-12", original_due: null });
 });
+
+test("day view groups tasks into overdue, due that day and coming up", async () => {
+  const { groupForDay } = await import("../lib/dayView.ts");
+  const mk = (id: number, due: string | null) => ({ id, due_date: due, priority: 2 }) as never;
+  const list = [mk(1, "2026-11-20"), mk(2, "2026-11-10"), mk(3, null), mk(4, "2026-11-16"), mk(5, "2026-11-12")];
+  const g = groupForDay(list, "2026-11-16", "2026-11-16");
+  assert.deepEqual(g.map((s) => [s.key, s.label, s.tasks.map((t: { id: number }) => t.id)]),
+    [["overdue", "Overdue", [2, 5]], ["today", "Due today", [4, 3]], ["upcoming", "Coming up", [1]]]);
+  assert.deepEqual(groupForDay([mk(1, "2026-11-18")], "2026-11-16", "2026-11-16").map((s) => s.key), ["upcoming"]);
+  assert.equal(groupForDay([mk(1, "2026-11-18")], "2026-11-18", "2026-11-16")[0].label, "Due this day");
+  assert.deepEqual(groupForDay([], "2026-11-16", "2026-11-16"), []);
+});
