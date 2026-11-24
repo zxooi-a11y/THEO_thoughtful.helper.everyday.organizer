@@ -48,6 +48,10 @@ type Props = { event: LifeEvent; project?: { name: string; color: string } | nul
 export default function EventCard({ event: e, project, today, onFavorite, onOpen }: Props) {
   const k = eventTheme(e.kind, project);
   const [, m, d] = e.start_date.split("-").map(Number);
+  // A run of several days shows its whole length: "07–14", or "28–03" with "DEC – JAN" across a month end
+  const [, m2, d2] = (e.end_date && e.end_date > e.start_date ? e.end_date : e.start_date).split("-").map(Number);
+  const multi = !!e.end_date && e.end_date > e.start_date;
+  const pad = (n: number) => String(n).padStart(2, "0");
   const past = (e.end_date ?? e.start_date) < today;
   const soon = countdown(e, today);
   // Single day: "16:00 – 18:30". Several days: the start time belongs to the first day, the end time to the last.
@@ -56,8 +60,8 @@ export default function EventCard({ event: e, project, today, onFavorite, onOpen
   return (
     <article className={`event-card${past ? " past" : ""}`} onClick={onOpen} style={{ ["--ev" as string]: k.accent }}>
       <div className="ev-date" style={{ background: k.panel }}>
-        <div className="ev-month">{MONTH[m - 1]}</div>
-        <div className="ev-day">{String(d).padStart(2, "0")}</div>
+        <div className={`ev-month${multi && m2 !== m ? " two" : ""}`}>{MONTH[m - 1]}{multi && m2 !== m ? ` – ${MONTH[m2 - 1]}` : ""}</div>
+        <div className={`ev-day${multi ? " multi" : ""}`}>{pad(d)}{multi ? `–${pad(d2)}` : ""}</div>
         <div className="ev-rule" />
         <div className="ev-range">{rangeLabel(e)}</div>
         {times.map((t) => <div key={t} className="ev-range ev-time">{t}</div>)}

@@ -600,3 +600,8 @@ select.pill { appearance: auto; }
 .ev-loc a.ev-maps:hover span { text-decoration: underline; }
 .maps-link { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 .maps-link:hover { text-decoration: underline; color: var(--accent-dark); }
+
+/* Multi-day events: the date block shows the whole run, e.g. 07–14 */
+.ev-day.multi { font-size: 34px; line-height: 1.2; white-space: nowrap; margin-top: 8px; }
+.ev-month.two { font-size: 14px; white-space: nowrap; }
+@media (max-width: 640px) { .ev-day.multi { font-size: 27px; } .ev-month.two { font-size: 12px; } }
