@@ -1,4 +1,5 @@
 "use client";
+import { mapsUrl } from "@/lib/maps";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { detectKind, endTimeProblem, EVENT_KINDS, kindOf, type LifeEvent } from "@/lib/events";
 import type { EventHints } from "@/lib/brain";
@@ -283,8 +284,11 @@ export default function EventsPage() {
 
             <div className="form-row stack-mobile">
               <label className="stack" style={{ gap: 6 }}>
-                <span className="small" style={{ fontWeight: 700 }}>Location</span>
-                <input className="input" placeholder="e.g. Kuala Lumpur, Malaysia" value={draft.location} onChange={(e) => upd({ location: e.target.value })} />
+                <span className="row between" style={{ minHeight: 22 }}>
+                  <span className="small" style={{ fontWeight: 700 }}>Location</span>
+                  {mapsUrl(draft.location) && <a className="btn ghost small" style={{ padding: "0 6px" }} href={mapsUrl(draft.location)!} target="_blank" rel="noopener noreferrer">Open in Maps ↗</a>}
+                </span>
+                <input className="input" placeholder="e.g. Kuala Lumpur, Malaysia, or paste a Google Maps link" value={draft.location} onChange={(e) => upd({ location: e.target.value })} />
               </label>
               <label className="stack" style={{ gap: 6 }}>
                 <span className="small" style={{ fontWeight: 700 }}>Link</span>

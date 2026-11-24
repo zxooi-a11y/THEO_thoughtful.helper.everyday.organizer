@@ -1,4 +1,5 @@
 "use client";
+import { mapsUrl } from "@/lib/maps";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, startOfWeek, toDate } from "@/lib/brain/dates";
 import { colorOf } from "@/lib/colors";
@@ -286,7 +287,11 @@ export default function CalendarPage() {
                     <span className="chip" style={{ background: k.pill, color: k.accent }}>★ {k.label}</span>
                     <div className="grow">
                       <div style={{ fontWeight: 700 }}>{e.title}</div>
-                      <div className="muted small">{[timeRange(e), e.location].filter(Boolean).join(" · ") || "All day"}</div>
+                      <div className="muted small">
+                        {timeRange(e) || (e.location ? "" : "All day")}{timeRange(e) && e.location ? " · " : ""}
+                        {e.location && <button type="button" className="maps-link" title="Open in Google Maps"
+                          onClick={(x) => { x.preventDefault(); x.stopPropagation(); window.open(mapsUrl(e.location)!, "_blank", "noopener,noreferrer"); }}>📍 {e.location}</button>}
+                      </div>
                     </div>
                   </a>
                 );

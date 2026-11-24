@@ -594,3 +594,9 @@ select.pill { appearance: auto; }
   .ot-row .name { grid-column: 1 / -1; }
   .ot-row .rate { grid-column: 2; }
 }
+
+/* Locations open Google Maps */
+.ev-loc a.ev-maps { display: flex; align-items: center; gap: 8px; min-width: 0; color: inherit; text-decoration: none; }
+.ev-loc a.ev-maps:hover span { text-decoration: underline; }
+.maps-link { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.maps-link:hover { text-decoration: underline; color: var(--accent-dark); }

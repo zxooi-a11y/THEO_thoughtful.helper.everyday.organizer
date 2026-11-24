@@ -434,3 +434,13 @@ test("day view groups tasks into overdue, due that day and coming up", async () 
   assert.equal(groupForDay([mk(1, "2026-11-18")], "2026-11-18", "2026-11-16")[0].label, "Due this day");
   assert.deepEqual(groupForDay([], "2026-11-16", "2026-11-16"), []);
 });
+
+test("locations open Google Maps", async () => {
+  const { mapsUrl } = await import("../lib/maps.ts");
+  assert.equal(mapsUrl("Bandar Utama, One Square"), "https://www.google.com/maps/search/?api=1&query=Bandar%20Utama%2C%20One%20Square");
+  assert.equal(mapsUrl("  "), null);
+  assert.equal(mapsUrl(null), null);
+  assert.equal(mapsUrl("https://maps.app.goo.gl/abc123"), "https://maps.app.goo.gl/abc123");
+  // not a web link → searched as text, never used as a link itself
+  assert.ok(mapsUrl("javascript:alert(1)")!.startsWith("https://www.google.com/maps/search/"));
+});

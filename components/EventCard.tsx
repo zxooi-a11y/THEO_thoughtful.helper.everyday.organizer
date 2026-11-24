@@ -1,4 +1,5 @@
 "use client";
+import { mapsUrl } from "@/lib/maps";
 import { eventTheme, timeRange, type LifeEvent } from "@/lib/events";
 import { daysBetween } from "@/lib/brain/dates";
 import { fmtTime } from "@/lib/time";
@@ -73,7 +74,11 @@ export default function EventCard({ event: e, project, today, onFavorite, onOpen
         </div>
         {e.notes && <p className="ev-desc">{e.notes}</p>}
         <div className="ev-foot">
-          <span className="ev-loc">{e.location && <><Pin /> <span>{e.location}</span></>}</span>
+          <span className="ev-loc">{e.location && (
+            <a className="ev-maps" href={mapsUrl(e.location)!} target="_blank" rel="noopener noreferrer" onClick={(x) => x.stopPropagation()} title="Open in Google Maps">
+              <Pin /> <span>{e.location}</span>
+            </a>
+          )}</span>
           {e.files?.length > 0 && <span className="ev-files" title={e.files.map((f) => f.name).join(", ")}>📎 {e.files.length}</span>}
           {e.url && (
             <a className="ev-link" href={e.url} target="_blank" rel="noopener noreferrer" onClick={(x) => x.stopPropagation()} aria-label="Open event link" title={e.url}>
